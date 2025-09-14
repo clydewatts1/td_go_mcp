@@ -1,147 +1,75 @@
-# td_go_mcp# td_go_mcp
+# td_go_mcp
 
+A database-centric MCP (Model Context Protocol) server in Go that provides dynamic tools defined via YAML configurations.
 
+## Features
 
-A database-centric MCP (Model Context Protocol) server in Go that provides dynamic tools defined via YAML configurations.A minimal Go HTTP server scaffold intended as a base for an MCP server. It exposes a root endpoint returning JSON and a `/healthz` endpoint.
+- **Dynamic Tool Loading**: Tools are defined in YAML files and loaded at runtime
+- **Database Integration**: Connect to databases via ODBC (default: Teradata DSN 'teradw')
+- **SQL Template Processing**: Template-based SQL generation with parameter substitution
+- **MCP Protocol**: Full stdio-based MCP server with `initialize`, `tools/list`, and `tools/call`
+- **HTTP Server**: Health check and info endpoints
+- **SQL Preview Mode**: Generate SQL without executing (add `"__preview": true` to tool calls)
+- **Error Handling**: Comprehensive validation and error reporting
 
-
-
-## Features## Prerequisites
+## Prerequisites
 
 - Go 1.21+
-
-- **Dynamic Tool Loading**: Tools are defined in YAML files and loaded at runtime- Windows PowerShell (default shell)
-
-- **Database Integration**: Connect to databases via ODBC (default: Teradata DSN 'teradw')
-
-- **SQL Template Processing**: Template-based SQL generation with parameter substitution## Setup
-
-- **MCP Protocol**: Full stdio-based MCP server with `initialize`, `tools/list`, and `tools/call`- Initialize and download dependencies:
-
-- **HTTP Server**: Health check and info endpoints
-
-- **SQL Preview Mode**: Generate SQL without executing (add `"__preview": true` to tool calls)```powershell
-
-- **Error Handling**: Comprehensive validation and error reporting# From the repo root
-
-go mod tidy
-
-## Prerequisites```
-
-
-
-- Go 1.21+## Run
-
-- Windows PowerShell- Start the server (default port 8080):
-
+- Windows PowerShell
 - ODBC drivers for your target database (optional)
 
+## Setup
+
+1. **Initialize dependencies:**
 ```powershell
-
-## Setup# PowerShell
-
-$env:PORT="8080"; go run ./cmd/server
-
-1. **Initialize dependencies:**```
-
-```powershell
-
-go mod tidyOpen http://localhost:8080 to see the JSON response.
-
+go mod tidy
 ```
 
-## Test
-
-2. **Configure database (optional):**```powershell
-
-   Set environment variables or use default Teradata DSN:go test ./...
-
-```powershell```
-
+2. **Configure database (optional):**
+   Set environment variables or use default Teradata DSN:
+```powershell
 $env:DB_DSN="your_dsn_name"
-
-# or## VS Code
-
-$env:DB_CONNECTION_STRING="your_connection_string"- Use the provided tasks in `.vscode/tasks.json`:
-
-```  - `go: tidy`, `go: build`, `go: test`, `go: run server`.
-
-- Debug with the `Debug Server` launch configuration.
+# or
+$env:DB_CONNECTION_STRING="your_connection_string"
+```
 
 ## Project Structure
 
-## Next Steps (MCP)
-
-```This repo now includes a minimal MCP stdio server at `cmd/mcp` with:
-
-td_go_mcp/ - `initialize`
-
-├── cmd/ - `tools/list` returning a single `ping` tool
-
-│   ├── mcp/         # MCP stdio server - `tools/call` for `ping`
-
+```
+td_go_mcp/
+├── cmd/
+│   ├── mcp/         # MCP stdio server
 │   └── server/      # HTTP server
-
-├── internal/VS Code MCP config points to it via `.vscode/mcp.json`.
-
+├── internal/
 │   ├── db/          # Database connection and config
-
-│   ├── mcp/         # MCP protocol types and transportManual stdio test (PowerShell):
-
-│   ├── server/      # HTTP server handlers```powershell
-
-│   └── tools/       # Tool definition loading and SQL processing$req = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"manual"}}}'
-
-├── tools/           # YAML tool definitions$frame = "Content-Length: " + ($req.Length) + "\r\n\r\n" + $req
-
-│   ├── count_records.yamlecho $frame | go run ./cmd/mcp
-
-│   ├── get_user_by_id.yaml```
-
+│   ├── mcp/         # MCP protocol types and transport
+│   ├── server/      # HTTP server handlers
+│   └── tools/       # Tool definition loading and SQL processing
+├── tools/           # YAML tool definitions
+│   ├── count_records.yaml
+│   ├── get_user_by_id.yaml
 │   └── list_active_sessions.yaml
+└── .vscode/         # VS Code configuration
+```
 
-└── .vscode/         # VS Code configurationAdditional tool calls:
+## Tool Definition Format
 
-``````powershell
-
-# List tools
-
-## Tool Definition Format$req = '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'; $frame = "Content-Length: " + ($req.Length) + "`r`n`r`n" + $req; $frame | go run ./cmd/mcp
-
-
-
-Tools are defined in YAML files in the `tools/` directory:# Call ping
-
-$req = '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ping","arguments":{"text":"hello"}}}'; $frame = "Content-Length: " + ($req.Length) + "`r`n`r`n" + $req; $frame | go run ./cmd/mcp
+Tools are defined in YAML files in the `tools/` directory:
 
 ```yaml
-
-name: "example_tool"# Call time
-
-description: "Example tool description"$req = '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"time","arguments":{}}}'; $frame = "Content-Length: " + ($req.Length) + "`r`n`r`n" + $req; $frame | go run ./cmd/mcp
-
+name: "example_tool"
+description: "Example tool description"
 sql_template: |
-
-  SELECT * FROM users # Call upper
-
-  WHERE id = '{{.user_id}}'$req = '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"upper","arguments":{"text":"abc def"}}}'; $frame = "Content-Length: " + ($req.Length) + "`r`n`r`n" + $req; $frame | go run ./cmd/mcp
-
+  SELECT * FROM users 
+  WHERE id = '{{.user_id}}'
   {{#if .include_details}}
-
-  AND status = 'active'# Call sum
-
-  {{/if}}$req = '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"sum","arguments":{"numbers":[1,2,3.5]}}}'; $frame = "Content-Length: " + ($req.Length) + "`r`n`r`n" + $req; $frame | go run ./cmd/mcp
-
+  AND status = 'active'
+  {{/if}}
 parameters:
-
-  user_id:# Call uuid
-
-    type: "string"$req = '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"uuid","arguments":{}}}'; $frame = "Content-Length: " + ($req.Length) + "`r`n`r`n" + $req; $frame | go run ./cmd/mcp
-
-    description: "User ID to query"```
-
+  user_id:
+    type: "string"
+    description: "User ID to query"
   include_details:
-
     type: "boolean" 
     description: "Include detailed information"
     default: false
@@ -159,6 +87,56 @@ go run ./cmd/mcp
 ### HTTP Server
 ```powershell
 $env:PORT="8080"; go run ./cmd/server
+```
+
+## Gemini CLI Integration
+
+To use this MCP server with the Gemini CLI, create or update your MCP configuration file:
+
+### Windows Configuration
+Create or edit `%APPDATA%\gemini\mcp_servers.json`:
+```json
+{
+  "servers": {
+    "td-go-mcp": {
+      "command": "go",
+      "args": ["run", "./cmd/mcp"],
+      "cwd": "C:/Users/YOUR_USERNAME/Projects/td_go_mcp",
+      "env": {
+        "DB_DSN": "teradw"
+      }
+    }
+  }
+}
+```
+
+### Linux/macOS Configuration
+Create or edit `~/.config/gemini/mcp_servers.json`:
+```json
+{
+  "servers": {
+    "td-go-mcp": {
+      "command": "go",
+      "args": ["run", "./cmd/mcp"],
+      "cwd": "/path/to/your/td_go_mcp",
+      "env": {
+        "DB_DSN": "teradw"
+      }
+    }
+  }
+}
+```
+
+### Usage with Gemini CLI
+After configuration, the tools will be available in Gemini CLI:
+```bash
+# Start Gemini CLI (it will automatically load MCP servers)
+gemini
+
+# Use the tools in conversation
+"Can you count records in the users table?"
+"Get user details for ID 12345"
+"List all active sessions"
 ```
 
 ## VS Code Integration

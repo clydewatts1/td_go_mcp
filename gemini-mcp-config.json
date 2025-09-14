@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "td-go-mcp": {
+      "command": "go",
+      "args": ["run", "./cmd/mcp"],
+      "cwd": "C:/Users/YOUR_USERNAME/Projects/td_go_mcp",
+      "env": {
+        "DB_DSN": "teradw",
+        "DB_DRIVER": "odbc"
+      }
+    }
+  }
+}
