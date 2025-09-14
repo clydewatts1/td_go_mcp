@@ -1,0 +1,27 @@
+name: get_user_by_id
+description: Retrieve user information by ID
+parameters:
+  user_id:
+    type: string
+    description: The unique identifier for the user
+  include_details:
+    type: boolean
+    description: Include detailed user information
+    default: false
+required:
+  - user_id
+return_type: object
+sql_template: |
+  SELECT 
+    user_id,
+    username,
+    email,
+    {{if .include_details}}
+    first_name,
+    last_name,
+    created_at
+    {{else}}
+    first_name || ' ' || last_name as full_name
+    {{end}}
+  FROM users 
+  WHERE user_id = '{{.user_id}}'

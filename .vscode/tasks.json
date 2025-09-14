@@ -1,0 +1,66 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "go: tidy",
+      "type": "shell",
+      "command": "go",
+      "args": ["mod", "tidy"],
+      "options": { "cwd": "." },
+      "problemMatcher": []
+    },
+    {
+      "label": "go: build",
+      "type": "shell",
+      "command": "go",
+      "args": ["build", "./..."],
+      "options": { "cwd": "." },
+      "problemMatcher": "$go"
+    },
+    {
+      "label": "go: test",
+      "type": "shell",
+      "command": "go",
+      "args": ["test", "./..."],
+      "options": { "cwd": "." },
+      "problemMatcher": "$go"
+    },
+    {
+      "label": "go: run server",
+      "type": "shell",
+      "command": "go",
+      "args": ["run", "./cmd/server"],
+      "options": { "cwd": ".", "env": { "PORT": "8080" } },
+      "isBackground": true,
+      "problemMatcher": []
+    }
+    ,
+    {
+      "label": "go: run mcp",
+      "type": "shell",
+      "command": "go",
+      "args": ["run", "./cmd/mcp"],
+      "options": { "cwd": "." },
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "test: http health",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-Command", "Invoke-WebRequest http://localhost:8080/healthz | Select-Object -ExpandProperty Content"],
+      "options": { "cwd": "." },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "test: mcp tools list",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-Command", "$req='{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}'; $bytes=[System.Text.Encoding]::UTF8.GetBytes($req); $header='Content-Length: ' + $bytes.Length + \"`r`n`r`n\"; ($header + $req) | go run ./cmd/mcp"],
+      "options": { "cwd": "." },
+      "problemMatcher": [],
+      "group": "test"
+    }
+  ]
+}

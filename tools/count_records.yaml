@@ -1,0 +1,25 @@
+name: count_records
+description: Count records in a specified table with optional filtering
+parameters:
+  table_name:
+    type: string
+    description: Name of the table to count records from
+  date_filter:
+    type: string
+    description: Optional date filter (YYYY-MM-DD format)
+  status:
+    type: string
+    description: Optional status filter
+required:
+  - table_name
+return_type: integer
+sql_template: |
+  SELECT COUNT(*) as record_count
+  FROM {{.table_name}}
+  WHERE 1=1
+  {{if .date_filter}}
+  AND DATE(created_at) = '{{.date_filter}}'
+  {{end}}
+  {{if .status}}
+  AND status = '{{.status}}'
+  {{end}}

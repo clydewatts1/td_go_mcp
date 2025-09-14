@@ -1,0 +1,29 @@
+name: list_active_sessions
+description: List all active user sessions
+parameters:
+  limit:
+    type: integer
+    description: Maximum number of sessions to return
+    default: 100
+  user_type:
+    type: string
+    description: Filter by user type (admin, user, guest)
+    default: "user"
+required: []
+return_type: array
+sql_template: |
+  SELECT 
+    session_id,
+    user_id,
+    login_time,
+    last_activity,
+    ip_address
+  FROM user_sessions 
+  WHERE active = 1
+  {{if .user_type}}
+  AND user_type = '{{.user_type}}'
+  {{end}}
+  ORDER BY last_activity DESC
+  {{if .limit}}
+  LIMIT {{.limit}}
+  {{end}}
