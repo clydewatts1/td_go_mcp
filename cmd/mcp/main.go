@@ -1,223 +1,229 @@
 package main
 
 import (
+	"bufio"
+	"crypto/rand"
 	"encoding/json"
-	"log"
+	"fmt"
 	"os"
 	"strings"
+	"time"
 
-	"td_go_mcp/internal/db"
 	"td_go_mcp/internal/mcp"
-	"td_go_mcp/internal/tools"
 )
-
-var (
-	loadedTools []tools.ToolDefinition
-	processors  map[string]*tools.SQLProcessor
-	database    *db.DB
-)
-
-func init() {
-	var err error
-	loadedTools, err = tools.LoadToolsFromDirectory("tools")
-	if err != nil {
-		log.Printf("Error loading tools: %v", err)
-		loadedTools = []tools.ToolDefinition{} // Continue with empty tools
-	}
-
-	processors = make(map[string]*tools.SQLProcessor)
-	for i := range loadedTools {
-		processors[loadedTools[i].Name] = tools.NewSQLProcessor(loadedTools[i])
-	}
-
-	log.Printf("Loaded %d tools from YAML files", len(loadedTools))
-
-	// Initialize database connection
-	dbConfig := db.LoadConfig()
-	database, err = db.Connect(dbConfig)
-	if err != nil {
-		log.Printf("Warning: Database connection failed: %v", err)
-		log.Printf("Continuing without database - SQL preview mode only")
-		database = nil
-	} else {
-		log.Printf("Database connection established successfully")
-	}
-}
 
 func main() {
-	t := mcp.NewTransport(os.Stdin, os.Stdout)
-	log.SetOutput(os.Stderr)
-
-	// Ensure database connection is closed on exit
-	defer func() {
-		if database != nil {
-			database.Close()
-		}
-	}()
-
+	in := bufio.NewReader(os.Stdin)
 	for {
-		msg, err := t.Read()
+		body, err := mcp.ReadFrame(in)
 		if err != nil {
+			// Exit cleanly on EOF/pipe close
 			if err.Error() == "EOF" {
 				return
 			}
-			log.Printf("read error: %v", err)
+			// Best-effort error response if we can't parse a request id
+			_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+				JSONRPC: "2.0",
+				Error:   &mcp.RespError{Code: -32700, Message: "read error: " + err.Error()},
+			})
 			return
 		}
 
 		var req mcp.Request
-		if err := json.Unmarshal(msg, &req); err != nil {
-			log.Printf("json err: %v", err)
+		if err := json.Unmarshal(body, &req); err != nil {
+			_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+				JSONRPC: "2.0",
+				Error:   &mcp.RespError{Code: -32700, Message: "parse error: " + err.Error()},
+			})
 			continue
 		}
 
 		switch req.Method {
 		case "initialize":
-			handleInitialize(req, t)
+			handleInitialize(req)
 		case "tools/list":
-			handleToolsList(req, t)
+			handleToolsList(req)
 		case "tools/call":
-			handleToolsCall(req, t)
+			handleToolsCall(req)
 		default:
-			sendError(req, t, -32601, "Method not found")
+			_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &mcp.RespError{Code: -32601, Message: "method not found"},
+			})
 		}
 	}
 }
 
-func handleInitialize(req mcp.Request, t *mcp.Transport) {
+func handleInitialize(req mcp.Request) {
 	var params mcp.InitializeParams
 	if req.Params != nil {
 		_ = json.Unmarshal(*req.Params, &params)
 	}
 
 	res := mcp.InitializeResult{
-		Capabilities: map[string]any{"tools": map[string]any{}},
+		Capabilities: map[string]any{
+			"tools": map[string]any{},
+		},
 	}
 	res.ServerInfo.Name = "td-go-mcp"
-	res.ServerInfo.Version = "0.2.0"
+	res.ServerInfo.Version = "0.1.0"
 
-	out, _ := json.Marshal(mcp.Response{JSONRPC: "2.0", ID: req.ID, Result: res})
-	_ = t.Write(out)
+	_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  res,
+	})
 }
 
-func handleToolsList(req mcp.Request, t *mcp.Transport) {
-	var mcpTools []mcp.Tool
-
-	for i := range loadedTools {
-		mcpTool := loadedTools[i].ToMCPTool()
-		mcpTools = append(mcpTools, mcp.Tool{
-			Name:        mcpTool["name"].(string),
-			Description: mcpTool["description"].(string),
-			InputSchema: mcpTool["inputSchema"].(map[string]any),
-		})
+func toolDefs() []mcp.Tool {
+	return []mcp.Tool{
+		{
+			Name:        "ping",
+			Description: "Echo back the input text prefixed with 'pong: '",
+			InputSchema: map[string]any{
+				"type":       "object",
+				"required":   []string{"text"},
+				"properties": map[string]any{"text": map[string]any{"type": "string"}},
+			},
+		},
+		{
+			Name:        "time",
+			Description: "Return current UTC time in RFC3339 format",
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
+			Name:        "upper",
+			Description: "Uppercase the provided text",
+			InputSchema: map[string]any{
+				"type":       "object",
+				"required":   []string{"text"},
+				"properties": map[string]any{"text": map[string]any{"type": "string"}},
+			},
+		},
+		{
+			Name:        "sum",
+			Description: "Sum an array of numbers",
+			InputSchema: map[string]any{
+				"type":     "object",
+				"required": []string{"numbers"},
+				"properties": map[string]any{
+					"numbers": map[string]any{
+						"type":  "array",
+						"items": map[string]any{"type": "number"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "uuid",
+			Description: "Generate a UUID v4",
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
 	}
-
-	out, _ := json.Marshal(mcp.Response{JSONRPC: "2.0", ID: req.ID, Result: mcp.ToolsListResult{Tools: mcpTools}})
-	_ = t.Write(out)
 }
 
-func handleToolsCall(req mcp.Request, t *mcp.Transport) {
-	var params mcp.ToolCallParams
+func handleToolsList(req mcp.Request) {
+	_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  mcp.ToolsListResult{Tools: toolDefs()},
+	})
+}
+
+func handleToolsCall(req mcp.Request) {
+	var params mcp.ToolsCallParams
 	if req.Params != nil {
 		if err := json.Unmarshal(*req.Params, &params); err != nil {
-			sendError(req, t, -32602, "Invalid params: "+err.Error())
+			_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &mcp.RespError{Code: -32602, Message: "invalid params"},
+			})
 			return
 		}
 	}
 
-	// Validate tool name
-	if params.Name == "" {
-		sendError(req, t, -32602, "Tool name is required")
-		return
+	writeText := func(text string) {
+		_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Result:  mcp.ToolsCallResult{Content: []mcp.ContentItem{{Type: "text", Text: text}}},
+		})
 	}
 
-	processor, exists := processors[params.Name]
-	if !exists {
-		sendError(req, t, -32601, "Tool not found: "+params.Name)
-		return
+	switch params.Name {
+	case "ping":
+		text := getString(params.Arguments, "text")
+		writeText("pong: " + text)
+	case "time":
+		writeText(time.Now().UTC().Format(time.RFC3339))
+	case "upper":
+		text := getString(params.Arguments, "text")
+		writeText(strings.ToUpper(text))
+	case "sum":
+		total := sumNumbers(params.Arguments["numbers"])
+		writeText(fmt.Sprintf("sum: %g", total))
+	case "uuid":
+		writeText(uuidV4())
+	default:
+		_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error:   &mcp.RespError{Code: -32601, Message: "unknown tool: " + params.Name},
+		})
 	}
-
-	// Ensure args is not nil
-	if params.Args == nil {
-		params.Args = make(map[string]interface{})
-	}
-
-	// Check if this is a preview request
-	preview := false
-	if p, ok := params.Args["__preview"]; ok {
-		if b, ok := p.(bool); ok {
-			preview = b
-		}
-		delete(params.Args, "__preview") // Remove from args for validation
-	}
-
-	// Validate parameters against tool schema
-	if err := processor.ValidateParameters(params.Args); err != nil {
-		sendError(req, t, -32602, "Parameter validation failed: "+err.Error())
-		return
-	}
-
-	// Process SQL template
-	sql, err := processor.ProcessTemplate(params.Args)
-	if err != nil {
-		sendError(req, t, -32603, "SQL template processing failed: "+err.Error())
-		return
-	}
-
-	// Validate SQL is not empty
-	if strings.TrimSpace(sql) == "" {
-		sendError(req, t, -32603, "Generated SQL is empty")
-		return
-	}
-
-	var result mcp.ToolCallResult
-	if preview {
-		// Return the generated SQL instead of executing it
-		result.Content = []mcp.ToolContent{{
-			Type: "text",
-			Text: "Generated SQL:\n" + sql,
-		}}
-	} else {
-		// Execute SQL against database and return results
-		if database == nil {
-			result.Content = []mcp.ToolContent{{
-				Type: "text",
-				Text: "Database connection not available. Use '__preview': true to see generated SQL.\n\nGenerated SQL:\n" + sql,
-			}}
-		} else {
-			rows, err := database.ExecuteQuery(sql)
-			if err != nil {
-				sendError(req, t, -32603, "SQL execution failed: "+err.Error())
-				return
-			}
-
-			// Convert results to JSON
-			resultJSON, err := json.Marshal(map[string]interface{}{
-				"rows":  rows,
-				"count": len(rows),
-				"sql":   sql,
-			})
-			if err != nil {
-				sendError(req, t, -32603, "Failed to marshal results: "+err.Error())
-				return
-			}
-
-			result.Content = []mcp.ToolContent{{
-				Type: "text",
-				Text: string(resultJSON),
-			}}
-		}
-	}
-
-	out, _ := json.Marshal(mcp.Response{JSONRPC: "2.0", ID: req.ID, Result: result})
-	_ = t.Write(out)
 }
 
-func sendError(req mcp.Request, t *mcp.Transport, code int, message string) {
-	out, _ := json.Marshal(mcp.Response{
-		JSONRPC: "2.0",
-		ID:      req.ID,
-		Error:   &mcp.RespError{Code: code, Message: message},
-	})
-	_ = t.Write(out)
+func getString(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func sumNumbers(v any) float64 {
+	arr, ok := v.([]any)
+	if !ok {
+		return 0
+	}
+	var total float64
+	for _, x := range arr {
+		switch n := x.(type) {
+		case float64:
+			total += n
+		case float32:
+			total += float64(n)
+		case int:
+			total += float64(n)
+		case int64:
+			total += float64(n)
+		case json.Number:
+			if f, err := n.Float64(); err == nil {
+				total += f
+			}
+		}
+	}
+	return total
+}
+
+func uuidV4() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16],
+	)
 }

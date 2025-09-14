@@ -3,6 +3,7 @@ package mcp
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -69,6 +70,51 @@ func parseContentLength(line string) (int, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+func ReadFrame(r *bufio.Reader) ([]byte, error) {
+	// Read headers
+	var contentLength int64 = -1
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		line = strings.TrimRight(line, "\r\n")
+		if line == "" {
+			break // end headers
+		}
+		k, v, _ := strings.Cut(line, ":")
+		if strings.EqualFold(strings.TrimSpace(k), "Content-Length") {
+			cl := strings.TrimSpace(v)
+			n, err := strconv.ParseInt(cl, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid Content-Length: %w", err)
+			}
+			contentLength = n
+		}
+	}
+	if contentLength < 0 {
+		return nil, fmt.Errorf("missing Content-Length header")
+	}
+	body := make([]byte, contentLength)
+	_, err := io.ReadFull(r, body)
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
+}
+
+func WriteJSON(w io.Writer, v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "Content-Length: %d\r\n\r\n", len(b))
+	buf.Write(b)
+	_, err = w.Write(buf.Bytes())
+	return err
 }
 
 // Helper to build framed message (useful for testing)

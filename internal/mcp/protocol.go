@@ -53,12 +53,26 @@ type ToolCallParams struct {
 	Args map[string]any `json:"arguments"`
 }
 
+type ToolsCallParams struct {
+	Name      string                 `json:"name"`
+	Arguments map[string]interface{} `json:"arguments,omitempty"`
+}
+
 type ToolCallResult struct {
 	Content []ToolContent `json:"content"`
 	IsError bool          `json:"isError,omitempty"`
 }
 
+type ToolsCallResult struct {
+	Content []ContentItem `json:"content"`
+}
+
 type ToolContent struct {
 	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type ContentItem struct {
+	Type string `json:"type"` // "text"
 	Text string `json:"text"`
 }
