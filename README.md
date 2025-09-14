@@ -103,11 +103,44 @@ req='{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"uuid","argu
 
 ## VS Code Usage
 
-1. Ensure VS Code has MCP client support
-2. The server is configured in `.vscode/mcp.json`
-3. Reload VS Code window to pick up MCP configuration
-4. Use MCP client commands to interact with the server
-5. Available tools: ping, time, upper, sum, uuid
+This MCP server is ready for VS Code integration. The configuration is already set up in `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "td-go-mcp": {
+      "type": "stdio", 
+      "command": "go",
+      "args": ["run", "./cmd/mcp"]
+    }
+  }
+}
+```
+
+### To use with VS Code MCP clients:
+
+1. **Install an MCP-compatible VS Code extension** such as:
+   - GitHub Copilot with MCP support
+   - Claude for VS Code with MCP support
+   - Or any other MCP client extension
+
+2. **Verify the server works** by running manually:
+```bash
+# Test that server starts and responds
+req='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"test"}}}'; bytes=`echo -n "$req" | wc -c`; (printf "Content-Length: $bytes\r\n\r\n$req"; sleep 1) | go run ./cmd/mcp
+```
+
+3. **Reload VS Code** after installing MCP extensions:
+   - Command Palette → "Developer: Reload Window"
+
+4. **The MCP client should automatically discover** the `td-go-mcp` server and its tools:
+   - ping: Echo with "pong:" prefix
+   - time: Current UTC timestamp  
+   - upper: Uppercase text
+   - sum: Add array of numbers
+   - uuid: Generate UUID v4
+
+5. **Use tools through the MCP client** - specific usage depends on the extension.
 
 ## Development
 
