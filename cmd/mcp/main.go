@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -13,15 +15,44 @@ import (
 )
 
 func main() {
+	// Setup logging
+	logDir := "logging"
+	os.MkdirAll(logDir, 0755)
+
+	currentLogPath := filepath.Join(logDir, "current.log")
+	historyLogPath := filepath.Join(logDir, "history-"+time.Now().Format("20060102")+".log")
+
+	currentLog, err := os.OpenFile(currentLogPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to open current log: %v\n", err)
+		os.Exit(1)
+	}
+	defer currentLog.Close()
+
+	historyLog, err := os.OpenFile(historyLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to open history log: %v\n", err)
+		os.Exit(1)
+	}
+	defer historyLog.Close()
+
+	log.SetOutput(currentLog)
+
+	logRequest := func(label string, data any) {
+		b, _ := json.MarshalIndent(data, "", "  ")
+		timestamp := time.Now().Format("2006-01-02 15:04:05")
+		entry := fmt.Sprintf("[%s] %s: %s\n", timestamp, label, string(b))
+		currentLog.WriteString(entry)
+		historyLog.WriteString(entry)
+	}
+
 	in := bufio.NewReader(os.Stdin)
 	for {
 		body, err := mcp.ReadFrame(in)
 		if err != nil {
-			// Exit cleanly on EOF/pipe close
 			if err.Error() == "EOF" {
 				return
 			}
-			// Best-effort error response if we can't parse a request id
 			_ = mcp.WriteJSON(os.Stdout, mcp.Response{
 				JSONRPC: "2.0",
 				Error:   &mcp.RespError{Code: -32700, Message: "read error: " + err.Error()},
@@ -31,6 +62,7 @@ func main() {
 
 		var req mcp.Request
 		if err := json.Unmarshal(body, &req); err != nil {
+			logRequest("parse error", string(body))
 			_ = mcp.WriteJSON(os.Stdout, mcp.Response{
 				JSONRPC: "2.0",
 				Error:   &mcp.RespError{Code: -32700, Message: "parse error: " + err.Error()},
@@ -38,24 +70,32 @@ func main() {
 			continue
 		}
 
+		logRequest("request", req)
+
+		var resp any
 		switch req.Method {
 		case "initialize":
-			handleInitialize(req)
+			resp = handleInitialize(req)
 		case "tools/list":
-			handleToolsList(req)
+			resp = handleToolsList(req)
 		case "tools/call":
-			handleToolsCall(req)
+			resp = handleToolsCall(req)
 		default:
-			_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+			resp = mcp.Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
 				Error:   &mcp.RespError{Code: -32601, Message: "method not found"},
-			})
+			}
+			_ = mcp.WriteJSON(os.Stdout, resp)
+		}
+
+		if resp != nil {
+			logRequest("response", resp)
 		}
 	}
 }
 
-func handleInitialize(req mcp.Request) {
+func handleInitialize(req mcp.Request) any {
 	var params mcp.InitializeParams
 	if req.Params != nil {
 		_ = json.Unmarshal(*req.Params, &params)
@@ -69,11 +109,13 @@ func handleInitialize(req mcp.Request) {
 	res.ServerInfo.Name = "td-go-mcp"
 	res.ServerInfo.Version = "0.1.0"
 
-	_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+	response := mcp.Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result:  res,
-	})
+	}
+	_ = mcp.WriteJSON(os.Stdout, response)
+	return response
 }
 
 func toolDefs() []mcp.Tool {
@@ -129,15 +171,17 @@ func toolDefs() []mcp.Tool {
 	}
 }
 
-func handleToolsList(req mcp.Request) {
-	_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+func handleToolsList(req mcp.Request) any {
+	response := mcp.Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result:  mcp.ToolsListResult{Tools: toolDefs()},
-	})
+	}
+	_ = mcp.WriteJSON(os.Stdout, response)
+	return response
 }
 
-func handleToolsCall(req mcp.Request) {
+func handleToolsCall(req mcp.Request) any {
 	var params mcp.ToolsCallParams
 	if req.Params != nil {
 		if err := json.Unmarshal(*req.Params, &params); err != nil {
@@ -150,34 +194,38 @@ func handleToolsCall(req mcp.Request) {
 		}
 	}
 
-	writeText := func(text string) {
-		_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+	writeText := func(text string) any {
+		response := mcp.Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Result:  mcp.ToolsCallResult{Content: []mcp.ContentItem{{Type: "text", Text: text}}},
-		})
+		}
+		_ = mcp.WriteJSON(os.Stdout, response)
+		return response
 	}
 
 	switch params.Name {
 	case "ping":
 		text := getString(params.Arguments, "text")
-		writeText("pong: " + text)
+		return writeText("pong: " + text)
 	case "time":
-		writeText(time.Now().UTC().Format(time.RFC3339))
+		return writeText(time.Now().UTC().Format(time.RFC3339))
 	case "upper":
 		text := getString(params.Arguments, "text")
-		writeText(strings.ToUpper(text))
+		return writeText(strings.ToUpper(text))
 	case "sum":
 		total := sumNumbers(params.Arguments["numbers"])
-		writeText(fmt.Sprintf("sum: %g", total))
+		return writeText(fmt.Sprintf("sum: %g", total))
 	case "uuid":
-		writeText(uuidV4())
+		return writeText(uuidV4())
 	default:
-		_ = mcp.WriteJSON(os.Stdout, mcp.Response{
+		response := mcp.Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Error:   &mcp.RespError{Code: -32601, Message: "unknown tool: " + params.Name},
-		})
+		}
+		_ = mcp.WriteJSON(os.Stdout, response)
+		return response
 	}
 }
 
