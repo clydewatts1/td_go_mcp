@@ -8,16 +8,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 	"td_go_mcp/internal/db"
 	"td_go_mcp/internal/tools"
+
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 var (
-	loadedTools []tools.ToolDefinition
-	processors  map[string]*tools.SQLProcessor
-	database    *db.DB
+	loadedTools   []tools.ToolDefinition
+	loadedPrompts []tools.PromptDefinition
+	processors    map[string]*tools.SQLProcessor
+	database      *db.DB
 )
 
 func init() {
@@ -33,7 +35,14 @@ func init() {
 		processors[loadedTools[i].Name] = tools.NewSQLProcessor(loadedTools[i])
 	}
 
-	log.Printf("Loaded %d tools from YAML files", len(loadedTools))
+	// Load prompts from YAML files
+	loadedPrompts, err = tools.LoadPromptsFromDirectory("tools")
+	if err != nil {
+		log.Printf("Error loading prompts: %v", err)
+		loadedPrompts = []tools.PromptDefinition{} // Continue with empty prompts
+	}
+
+	log.Printf("Loaded %d tools and %d prompts from YAML files", len(loadedTools), len(loadedPrompts))
 
 	// Initialize database connection
 	dbConfig := db.LoadConfig()
@@ -61,13 +70,19 @@ func main() {
 	// Create MCP server
 	mcpServer := server.NewMCPServer("td-go-mcp", "0.2.0",
 		server.WithToolCapabilities(true),
+		server.WithPromptCapabilities(true),
 	)
 
-	log.Printf("Registering %d tools with MCP server", len(loadedTools))
+	log.Printf("Registering %d tools and %d prompts with MCP server", len(loadedTools), len(loadedPrompts))
 
 	// Add tools to the MCP server
 	for _, toolDef := range loadedTools {
 		addToolToServer(mcpServer, toolDef)
+	}
+
+	// Add prompts to the MCP server
+	for _, promptDef := range loadedPrompts {
+		addPromptToServer(mcpServer, promptDef)
 	}
 
 	log.Printf("Starting MCP server with stdio transport...")
@@ -88,6 +103,18 @@ func addToolToServer(mcpServer *server.MCPServer, toolDef tools.ToolDefinition) 
 	// Add tool to server
 	mcpServer.AddTool(mcpTool, handler)
 	log.Printf("Registered tool: %s", toolDef.Name)
+}
+
+func addPromptToServer(mcpServer *server.MCPServer, promptDef tools.PromptDefinition) {
+	// Convert prompt definition to mcp.Prompt
+	mcpPrompt := convertPromptDefinition(promptDef)
+	
+	// Create handler function for this prompt
+	handler := createPromptHandler(promptDef)
+
+	// Add prompt to server
+	mcpServer.AddPrompt(mcpPrompt, handler)
+	log.Printf("Registered prompt: %s", promptDef.Name)
 }
 
 func convertToolDefinition(toolDef tools.ToolDefinition) mcp.Tool {
@@ -228,4 +255,76 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func convertPromptDefinition(promptDef tools.PromptDefinition) mcp.Prompt {
+	// Start with basic prompt options
+	opts := []mcp.PromptOption{
+		mcp.WithPromptDescription(promptDef.Description),
+	}
+
+	// Convert parameters to prompt arguments
+	if len(promptDef.Parameters) > 0 {
+		for paramName, param := range promptDef.Parameters {
+			argumentOpts := []mcp.ArgumentOption{
+				mcp.ArgumentDescription(param.Description),
+			}
+
+			// Check if this parameter is required (we'll use a simple heuristic - 
+			// parameters without defaults are considered required)
+			if param.Default == nil {
+				argumentOpts = append(argumentOpts, mcp.RequiredArgument())
+			}
+
+			opts = append(opts, mcp.WithArgument(paramName, argumentOpts...))
+		}
+	}
+
+	return mcp.NewPrompt(promptDef.Name, opts...)
+}
+
+func createPromptHandler(promptDef tools.PromptDefinition) func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	return func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		log.Printf("Handling prompt request: %s", promptDef.Name)
+
+		// Extract parameters from request
+		args := req.Params.Arguments
+		if args == nil {
+			args = make(map[string]string)
+		}
+
+		// Process the prompt template by substituting parameters
+		processedPrompt := promptDef.Prompt
+
+		// Simple template processing - replace {{param}} with actual values
+		for paramName, paramValue := range args {
+			placeholder := fmt.Sprintf("{{%s}}", paramName)
+			processedPrompt = strings.ReplaceAll(processedPrompt, placeholder, paramValue)
+		}
+
+		// Replace any remaining placeholders with defaults if available
+		for paramName, param := range promptDef.Parameters {
+			placeholder := fmt.Sprintf("{{%s}}", paramName)
+			if strings.Contains(processedPrompt, placeholder) {
+				if param.Default != nil {
+					if defaultStr, ok := param.Default.(string); ok {
+						processedPrompt = strings.ReplaceAll(processedPrompt, placeholder, defaultStr)
+					}
+				} else {
+					// Remove unfilled placeholders
+					processedPrompt = strings.ReplaceAll(processedPrompt, placeholder, "")
+				}
+			}
+		}
+
+		// Create prompt messages
+		messages := []mcp.PromptMessage{
+			{
+				Role:    mcp.RoleUser,
+				Content: mcp.TextContent{Type: "text", Text: processedPrompt},
+			},
+		}
+
+		return mcp.NewGetPromptResult(promptDef.Description, messages), nil
+	}
 }

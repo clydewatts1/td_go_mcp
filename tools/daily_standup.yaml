@@ -1,0 +1,27 @@
+type: prompt
+name: daily_standup
+description: "Generate questions for a daily standup meeting"
+prompt: |
+  You are facilitating a daily standup meeting. Please guide the team through the standard standup format.
+  
+  Ask each team member to share:
+  
+  1. **What did you work on yesterday?**
+     - Please describe the main tasks you completed
+     - Highlight any significant progress or achievements
+  
+  2. **What will you work on today?**
+     - Outline your planned tasks and priorities
+     - Mention any important deadlines or milestones
+  
+  3. **Are there any blockers or impediments?**
+     - Share any obstacles preventing your progress
+     - Identify anything you need help with from the team
+  
+  Remember to:
+  - Keep updates brief and focused
+  - Focus on work relevant to the team
+  - Speak up if you can help unblock someone
+  - Save detailed technical discussions for after the standup
+  
+  Let's start with the first team member!

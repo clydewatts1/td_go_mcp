@@ -1,0 +1,34 @@
+type: prompt
+name: code_review_assistant
+description: "Assist with code review by providing structured feedback and suggestions"
+prompt: |
+  You are an experienced software developer conducting a code review.
+  
+  Please review the following {{language}} code and provide feedback:
+  
+  ```{{language}}
+  {{code}}
+  ```
+  
+  Focus areas: {{focus_areas}}
+  
+  Please provide:
+  1. **Code Quality Assessment**: Rate the overall code quality and explain your reasoning
+  2. **Issues Found**: List any bugs, security vulnerabilities, or logic errors
+  3. **Best Practices**: Suggest improvements following {{language}} best practices
+  4. **Performance**: Identify potential performance optimizations
+  5. **Readability**: Comment on code clarity and suggest improvements
+  6. **Testing**: Recommend what tests should be written for this code
+
+parameters:
+  code:
+    type: string
+    description: "The code to be reviewed"
+  language:
+    type: string
+    description: "Programming language of the code"
+    default: "javascript"
+  focus_areas:
+    type: string
+    description: "Specific areas to focus the review on"
+    default: "security, performance, best practices"

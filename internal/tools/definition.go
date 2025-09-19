@@ -19,6 +19,15 @@ type ToolDefinition struct {
 	Required    []string             `yaml:"required" json:"required"`
 }
 
+// PromptDefinition represents a prompt loaded from YAML
+type PromptDefinition struct {
+	Type        string               `yaml:"type" json:"type"`
+	Name        string               `yaml:"name" json:"name"`
+	Prompt      string               `yaml:"prompt" json:"prompt"`
+	Description string               `yaml:"description,omitempty" json:"description,omitempty"`
+	Parameters  map[string]Parameter `yaml:"parameters,omitempty" json:"parameters,omitempty"`
+}
+
 // Parameter defines input parameter schema
 type Parameter struct {
 	Type        string `yaml:"type" json:"type"`
@@ -40,6 +49,11 @@ func LoadToolsFromDirectory(dir string) ([]ToolDefinition, error) {
 		}
 
 		if !info.IsDir() && (strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
+			// Skip prompt files when loading tools
+			if isPromptFile(path) {
+				return nil
+			}
+			
 			tool, err := loadToolFromFile(path)
 			if err != nil {
 				return fmt.Errorf("error loading %s: %w", path, err)
@@ -98,4 +112,78 @@ func (td *ToolDefinition) ToMCPTool() map[string]any {
 			"required":   td.Required,
 		},
 	}
+}
+
+// LoadPromptsFromDirectory loads all prompt YAML files from tools/ directory
+func LoadPromptsFromDirectory(dir string) ([]PromptDefinition, error) {
+	var prompts []PromptDefinition
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return prompts, nil // No tools directory, return empty
+	}
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() && (strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
+			// First check if this is a prompt file
+			if isPromptFile(path) {
+				prompt, err := loadPromptFromFile(path)
+				if err != nil {
+					return fmt.Errorf("error loading prompt %s: %w", path, err)
+				}
+				prompts = append(prompts, prompt)
+			}
+		}
+		return nil
+	})
+
+	return prompts, err
+}
+
+func isPromptFile(filepath string) bool {
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return false
+	}
+
+	// Quick check if this is a prompt file by looking for type: prompt
+	var quickCheck struct {
+		Type string `yaml:"type"`
+	}
+	
+	if err := yaml.Unmarshal(data, &quickCheck); err != nil {
+		return false
+	}
+	
+	return quickCheck.Type == "prompt"
+}
+
+func loadPromptFromFile(filepath string) (PromptDefinition, error) {
+	var prompt PromptDefinition
+
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return prompt, err
+	}
+
+	err = yaml.Unmarshal(data, &prompt)
+	if err != nil {
+		return prompt, err
+	}
+
+	// Validate required fields
+	if prompt.Type != "prompt" {
+		return prompt, fmt.Errorf("type must be 'prompt'")
+	}
+	if prompt.Name == "" {
+		return prompt, fmt.Errorf("name is required")
+	}
+	if prompt.Prompt == "" {
+		return prompt, fmt.Errorf("prompt text is required")
+	}
+
+	return prompt, nil
 }
