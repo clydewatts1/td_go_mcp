@@ -1,0 +1,86 @@
+{
+    // Go configuration
+    "go.useLanguageServer": true,
+    "go.formatTool": "goimports",
+    "go.lintTool": "golangci-lint",
+    "go.buildOnSave": "package",
+    "go.testOnSave": false,
+    // MCP Server configuration
+    "languageModelTools.mcpServers": {
+        "td-go-mcp": {
+            "command": "${workspaceFolder}/bin/mcp.exe",
+            "args": [],
+            "cwd": "C:/Users/cw171001/OneDrive - Teradata/Documents/GitHub/td_go_mcp/td_go_mcp",
+            "env": {
+                "DB_DSN": "teradw",
+                "DB_DRIVER": "odbc",
+                "LOG_LEVEL": "info"
+            }
+        }
+    },
+    // Terminal configuration for PowerShell
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "icon": "terminal-powershell"
+        }
+    },
+    // File associations
+    "files.associations": {
+        "*.yaml": "yaml",
+        "*.yml": "yaml",
+        "mcp.json": "json"
+    },
+    // Editor settings
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    },
+    // JSON schema validation for MCP config
+    "json.schemas": [
+        {
+            "fileMatch": [
+                "**/mcp.json"
+            ],
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "servers": {
+                        "type": "object",
+                        "patternProperties": {
+                            ".*": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "stdio",
+                                            "http"
+                                        ]
+                                    },
+                                    "command": {
+                                        "type": "string"
+                                    },
+                                    "args": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "env": {
+                                        "type": "object"
+                                    }
+                                },
+                                "required": [
+                                    "type",
+                                    "command"
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

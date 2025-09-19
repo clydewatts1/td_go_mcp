@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "td-go-mcp": {
+      "command": ".\\bin\\mcp-wrapper.bat",
+      "args": []
+    }
+  }
+}

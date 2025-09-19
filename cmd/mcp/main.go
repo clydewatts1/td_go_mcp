@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -48,6 +49,8 @@ func main() {
 	t := mcp.NewTransport(os.Stdin, os.Stdout)
 	log.SetOutput(os.Stderr)
 
+	log.Printf("MCP server started, waiting for initialize request...")
+
 	// Ensure database connection is closed on exit
 	defer func() {
 		if database != nil {
@@ -56,14 +59,19 @@ func main() {
 	}()
 
 	for {
+		log.Printf("Waiting for next message...")
 		msg, err := t.Read()
 		if err != nil {
-			if err.Error() == "EOF" {
+			// Treat common end-of-stream conditions as a normal client disconnect
+			if err == io.EOF || err.Error() == "EOF" || err.Error() == "missing Content-Length header" {
+				log.Printf("Client disconnected")
 				return
 			}
 			log.Printf("read error: %v", err)
 			return
 		}
+
+		log.Printf("Received raw message: %s", string(msg))
 
 		var req mcp.Request
 		if err := json.Unmarshal(msg, &req); err != nil {
@@ -71,9 +79,13 @@ func main() {
 			continue
 		}
 
+		log.Printf("Parsed request - Method: %s, ID: %s", req.Method, string(req.ID))
+
 		switch req.Method {
 		case "initialize":
 			handleInitialize(req, t)
+		case "initialized":
+			handleInitialized(req, t)
 		case "tools/list":
 			handleToolsList(req, t)
 		case "tools/call":
@@ -85,9 +97,15 @@ func main() {
 }
 
 func handleInitialize(req mcp.Request, t *mcp.Transport) {
+	log.Printf("Received initialize request with ID: %s", string(req.ID))
+
 	var params mcp.InitializeParams
 	if req.Params != nil {
-		_ = json.Unmarshal(*req.Params, &params)
+		if err := json.Unmarshal(*req.Params, &params); err != nil {
+			log.Printf("Error unmarshaling initialize params: %v", err)
+		} else {
+			log.Printf("Client info: %s v%s", params.ClientInfo.Name, params.ClientInfo.Version)
+		}
 	}
 
 	res := mcp.InitializeResult{
@@ -96,8 +114,24 @@ func handleInitialize(req mcp.Request, t *mcp.Transport) {
 	res.ServerInfo.Name = "td-go-mcp"
 	res.ServerInfo.Version = "0.2.0"
 
-	out, _ := json.Marshal(mcp.Response{JSONRPC: "2.0", ID: req.ID, Result: res})
-	_ = t.Write(out)
+	response := mcp.Response{JSONRPC: "2.0", ID: req.ID, Result: res}
+	out, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("Error marshaling initialize response: %v", err)
+		return
+	}
+
+	log.Printf("Sending initialize response: %s", string(out))
+	if err := t.Write(out); err != nil {
+		log.Printf("Error writing initialize response: %v", err)
+	} else {
+		log.Printf("Initialize response sent successfully")
+	}
+}
+
+func handleInitialized(req mcp.Request, t *mcp.Transport) {
+	log.Printf("Received initialized notification")
+	// This is a notification, no response needed
 }
 
 func handleToolsList(req mcp.Request, t *mcp.Transport) {

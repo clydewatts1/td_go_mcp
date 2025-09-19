@@ -1,12 +1,13 @@
 {
   "servers": {
     "td-go-mcp": {
-      "command": "go",
-      "args": ["run", "./cmd/mcp"],
-      "cwd": "C:/Users/YOUR_USERNAME/Projects/td_go_mcp",
+      "command": "C:/Users/cw171001/OneDrive - Teradata/Documents/GitHub/td_go_mcp/td_go_mcp/bin/mcp.exe",
+      "args": [],
+      "cwd": "C:\\Users\\cw171001\\OneDrive - Teradata\\Documents\\GitHub\\td_go_mcp\\td_go_mcp",
       "env": {
         "DB_DSN": "teradw",
-        "DB_DRIVER": "odbc"
+        "DB_DRIVER": "odbc",
+        "LOG_LEVEL": "info"
       }
     }
   }

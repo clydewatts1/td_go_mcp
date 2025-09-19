@@ -5,42 +5,69 @@
       "label": "go: tidy",
       "type": "shell",
       "command": "go",
-      "args": ["mod", "tidy"],
-      "options": { "cwd": "." },
+      "args": [
+        "mod",
+        "tidy"
+      ],
+      "options": {
+        "cwd": "."
+      },
       "problemMatcher": []
     },
     {
       "label": "go: build",
       "type": "shell",
       "command": "go",
-      "args": ["build", "./..."],
-      "options": { "cwd": "." },
+      "args": [
+        "build",
+        "./..."
+      ],
+      "options": {
+        "cwd": "."
+      },
       "problemMatcher": "$go"
     },
     {
       "label": "go: test",
       "type": "shell",
       "command": "go",
-      "args": ["test", "./..."],
-      "options": { "cwd": "." },
+      "args": [
+        "test",
+        "./..."
+      ],
+      "options": {
+        "cwd": "."
+      },
       "problemMatcher": "$go"
     },
     {
       "label": "go: run server",
       "type": "shell",
       "command": "go",
-      "args": ["run", "./cmd/server"],
-      "options": { "cwd": ".", "env": { "PORT": "8080" } },
+      "args": [
+        "run",
+        "./cmd/server"
+      ],
+      "options": {
+        "cwd": ".",
+        "env": {
+          "PORT": "8080"
+        }
+      },
       "isBackground": true,
       "problemMatcher": []
-    }
-    ,
+    },
     {
       "label": "go: run mcp",
       "type": "shell",
       "command": "go",
-      "args": ["run", "./cmd/mcp"],
-      "options": { "cwd": "." },
+      "args": [
+        "run",
+        "./cmd/mcp"
+      ],
+      "options": {
+        "cwd": "."
+      },
       "isBackground": false,
       "problemMatcher": []
     },
@@ -48,8 +75,13 @@
       "label": "test: http health",
       "type": "shell",
       "command": "powershell",
-      "args": ["-Command", "Invoke-WebRequest http://localhost:8080/healthz | Select-Object -ExpandProperty Content"],
-      "options": { "cwd": "." },
+      "args": [
+        "-Command",
+        "Invoke-WebRequest http://localhost:8080/healthz | Select-Object -ExpandProperty Content"
+      ],
+      "options": {
+        "cwd": "."
+      },
       "problemMatcher": [],
       "group": "test"
     },
@@ -57,10 +89,70 @@
       "label": "test: mcp tools list",
       "type": "shell",
       "command": "powershell",
-      "args": ["-Command", "$req='{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}'; $bytes=[System.Text.Encoding]::UTF8.GetBytes($req); $header='Content-Length: ' + $bytes.Length + \"`r`n`r`n\"; ($header + $req) | go run ./cmd/mcp"],
-      "options": { "cwd": "." },
+      "args": [
+        "-File",
+        "${workspaceFolder}/scripts/test-mcp-tools-list.ps1"
+      ],
+      "options": {
+        "cwd": "."
+      },
       "problemMatcher": [],
       "group": "test"
+    },
+    {
+      "label": "test: mcp tool preview",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-File",
+        "${workspaceFolder}/scripts/test-mcp-preview.ps1"
+      ],
+      "options": {
+        "cwd": "."
+      },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    // run compiled exe servers
+    {
+      "label": "run: mcp.exe",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/mcp.exe",
+      "options": {
+        "cwd": ".",
+        "env": {
+          "DB_DSN": "teradw",
+          "DB_DRIVER": "odbc"
+        }
+      },
+      "isBackground": false,
+      "problemMatcher": []
+    },
+    {
+      "label": "run: server.exe",
+      "type": "shell",
+      "command": "${workspaceFolder}/bin/server.exe",
+      "options": {
+        "cwd": ".",
+        "env": {
+          "PORT": "8080"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "go: build exes (script)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "scripts/build-exes.ps1"
+      ],
+      "group": "build"
     }
   ]
 }
