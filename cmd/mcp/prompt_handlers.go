@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
+
+	"golang.org/x/exp/slog"
 
 	"td_go_mcp/internal/tools"
 
@@ -18,7 +19,7 @@ func addPromptToServer(mcpServer *server.MCPServer, promptDef tools.PromptDefini
 	mcpPrompt := convertPromptDefinition(promptDef)
 	handler := createPromptHandler(promptDef)
 	mcpServer.AddPrompt(mcpPrompt, handler)
-	log.Printf("Registered prompt: %s", promptDef.Name)
+	slog.Info("Registered prompt", "prompt", promptDef.Name)
 }
 
 func convertPromptDefinition(promptDef tools.PromptDefinition) mcp.Prompt {
@@ -41,7 +42,7 @@ func convertPromptDefinition(promptDef tools.PromptDefinition) mcp.Prompt {
 
 func createPromptHandler(promptDef tools.PromptDefinition) func(context.Context, mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 	return func(ctx context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
-		log.Printf("Handling prompt request: %s", promptDef.Name)
+		slog.Info("Handling prompt request", "prompt", promptDef.Name)
 		args := req.Params.Arguments
 		if args == nil {
 			args = make(map[string]string)

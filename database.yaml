@@ -1,7 +1,7 @@
 # Database configuration for MCP server
 # Example for ODBC DSN (Teradata, SQL Server, etc.)
 driver: odbc
-dsn: teradw
+dsn: CLEARSCAPE
 # Optionally, for other drivers:
 # driver: postgres
 # dsn: "host=localhost port=5432 user=postgres password=secret dbname=mydb sslmode=disable"

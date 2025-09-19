@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"golang.org/x/exp/slog"
 )
 
 // Place tool handler functions here, e.g. createToolHandler(...)
@@ -24,7 +24,7 @@ func addToolToServer(mcpServer *server.MCPServer, toolDef tools.ToolDefinition) 
 		handler = createToolHandler(toolDef)
 	}
 	mcpServer.AddTool(convertToolDefinition(toolDef), handler)
-	log.Printf("Registered tool: %s", toolDef.Name)
+	slog.Info("Registered tool", "tool", toolDef.Name)
 }
 
 func convertToolDefinition(toolDef tools.ToolDefinition) mcp.Tool {
@@ -82,7 +82,7 @@ func convertToolDefinition(toolDef tools.ToolDefinition) mcp.Tool {
 
 func createToolHandler(toolDef tools.ToolDefinition) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		log.Printf("Handling tool call: %s", toolDef.Name)
+		slog.Info("Handling tool call", "tool", toolDef.Name)
 		processor, exists := processors[toolDef.Name]
 		if !exists {
 			return mcp.NewToolResultError(fmt.Sprintf("tool processor not found: %s", toolDef.Name)), nil
