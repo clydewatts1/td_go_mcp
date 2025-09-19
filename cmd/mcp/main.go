@@ -3,6 +3,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/mark3labs/mcp-go/server"
 	"golang.org/x/exp/slog"
@@ -12,6 +13,17 @@ import (
 
 func main() {
 	// Set up logging to file is handled in init.go
+
+	// Diagnostic logging
+	wd, err := os.Getwd()
+	if err != nil {
+		slog.Error("Failed to get working directory", "err", err)
+	}
+	slog.Info("Starting server", "working_directory", wd)
+
+	// Log contents of tools and prompts directories
+	logDirContents("tools")
+	logDirContents("prompts")
 
 	defer func() {
 		if database != nil {
@@ -40,4 +52,13 @@ func main() {
 		slog.Error("Server error", "err", err)
 		os.Exit(1)
 	}
+}
+
+func logDirContents(dir string) {
+	files, err := filepath.Glob(filepath.Join(dir, "*"))
+	if err != nil {
+		slog.Error("Failed to glob directory", "dir", dir, "err", err)
+		return
+	}
+	slog.Info("Directory contents", "dir", dir, "files", files)
 }

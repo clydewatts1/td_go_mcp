@@ -1,0 +1,23 @@
+type: resource
+subtype: glossary
+description: Returns a glossary consisting of a list of words, each with synonyms and a description.
+parameters: {}
+return_type: array
+return_test_message: test_data/glossary.json
+resource:
+  words:
+    - word: "database"
+      synonyms: ["DB", "datastore"]
+      description: "A structured collection of data stored electronically."
+    - word: "table"
+      synonyms: ["relation", "dataset"]
+      description: "A set of data elements organized in rows and columns."
+    - word: "column"
+      synonyms: ["field", "attribute"]
+      description: "A vertical entity in a table that contains all information associated with a specific field."
+    - word: "row"
+      synonyms: ["record", "tuple"]
+      description: "A single, implicitly structured data item in a table."
+    - word: "index"
+      synonyms: ["key", "pointer"]
+      description: "A database structure that improves the speed of data retrieval."

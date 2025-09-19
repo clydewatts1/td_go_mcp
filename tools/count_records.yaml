@@ -24,3 +24,4 @@ sql_template: |
   {{if .status}}
   AND status = '{{.status}}'
   {{end}}
+type: tool

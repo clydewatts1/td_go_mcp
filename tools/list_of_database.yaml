@@ -1,0 +1,27 @@
+name: list_databases
+description: List all databases in the connected server with optional filtering by name, owner, or type
+parameters:
+  database_name:
+    type: string
+    description: Databasename with wildcard (e.g. % for all databases)
+    default: "%"
+  database_type:
+    type: string
+    description: User type (D=Database, U=User)
+    default: "%"
+required: []
+return_type: array
+return_test_message: test_data/list_of_tables_in_database.json
+sql_template: |
+  SELECT databasename as database_name,
+         ownername as owner,
+         commentstring as description,
+         dbkind as database_type,
+         case when dbkind = 'D' then 'DATABASE'
+              when dbkind = 'U' then 'USER'
+              else dbkind end as database_type_desc
+  FROM dbc.databasesv
+  WHERE databasename LIKE '{{.database_name}}' 
+  AND trim(dbkind) LIKE '{{.database_type}}'
+  ORDER BY 1
+type: tool

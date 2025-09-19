@@ -1,7 +1,0 @@
-name: connection_status
-description: Returns the current database connection parameters and status (connected, not connected, or error)
-parameters: {}
-return_type: object
-sql_template: "SELECT 1 AS status" # Dummy SQL to satisfy loader
-required: []
-return_test_message: test_data/connection_status.json

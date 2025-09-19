@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"td_go_mcp/internal/db"
@@ -12,16 +13,38 @@ import (
 )
 
 var (
-	loadedTools   []tools.ToolDefinition
-	loadedPrompts []tools.PromptDefinition
-	processors    map[string]*tools.SQLProcessor
-	database      *db.DB
-	logger        *slog.Logger
+	loadedTools      []tools.ToolDefinition
+	loadedPrompts    []tools.PromptDefinition
+	loadedGlossaries []tools.GlossaryResource
+	processors       map[string]*tools.SQLProcessor
+	database         *db.DB
+	logger           *slog.Logger
+	basePath         string
 )
 
 func init() {
+	// Determine the base path of the executable
+	exePath, err := os.Executable()
+	if err != nil {
+		slog.Error("Failed to get executable path", "err", err)
+		os.Exit(1)
+	}
+	// Check if running with "go run"
+	if strings.Contains(exePath, "go-build") || strings.Contains(exePath, "exe\\main.exe") {
+		// Likely running with "go run", use current working directory
+		wd, err := os.Getwd()
+		if err != nil {
+			slog.Error("Failed to get working directory", "err", err)
+			os.Exit(1)
+		}
+		basePath = wd
+	} else {
+		// Running as a compiled binary, use the executable's directory
+		basePath = filepath.Dir(exePath)
+	}
+
 	// Set up logging directory and slog logger
-	logDir := "logging"
+	logDir := filepath.Join(basePath, "logging")
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		slog.Error("Failed to create logging directory", "err", err)
 		os.Exit(1)
@@ -35,9 +58,19 @@ func init() {
 	logger = slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{AddSource: true}))
 	slog.SetDefault(logger)
 
-	loadedTools, err = tools.LoadToolsFromDirectory("tools")
+	// Load glossary resources from tools
+	glossaryPath := filepath.Join(basePath, "tools")
+	loadedGlossaries, err = tools.LoadGlossaryResourcesFromDirectory(glossaryPath)
 	if err != nil {
-		logger.Error("Error loading tools", "err", err)
+		logger.Error("Error loading glossary resources", "err", err, "path", glossaryPath)
+		loadedGlossaries = []tools.GlossaryResource{}
+	}
+	logger.Info("Loaded glossary resources", "glossaries", len(loadedGlossaries))
+
+	toolsPath := filepath.Join(basePath, "tools")
+	loadedTools, err = tools.LoadToolsFromDirectory(toolsPath)
+	if err != nil {
+		logger.Error("Error loading tools", "err", err, "path", toolsPath)
 		loadedTools = []tools.ToolDefinition{} // Continue with empty tools
 	}
 
@@ -47,9 +80,10 @@ func init() {
 	}
 
 	// Load prompts from YAML files
-	loadedPrompts, err = tools.LoadPromptsFromDirectory("tools")
+	promptsPath := filepath.Join(basePath, "prompts")
+	loadedPrompts, err = tools.LoadPromptsFromDirectory(promptsPath)
 	if err != nil {
-		logger.Error("Error loading prompts", "err", err)
+		logger.Error("Error loading prompts", "err", err, "path", promptsPath)
 		loadedPrompts = []tools.PromptDefinition{} // Continue with empty prompts
 	}
 

@@ -1,3 +1,4 @@
+type: tool
 name: list_active_sessions
 description: List all active user sessions
 parameters:

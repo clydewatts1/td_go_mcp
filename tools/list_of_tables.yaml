@@ -1,0 +1,25 @@
+name: list_of_tables
+description: List all tables in the connected database
+parameters:
+  database_name:
+    type: string
+    description: Name of the database to list tables from
+required:
+  - database_name
+return_type: array
+return_test_message: test_data/list_of_tables_in_database.json
+sql_template: |
+  SELECT tablename as table_name,
+         tablekind as table_type,
+         case when tablekind = 'T' then 'TABLE'
+              when tablekind = 'V' then 'VIEW'
+              when tablekind = 'M' then 'MVIEW'
+              when tablekind = 'G' then 'GLOBAL TEMPORARY TABLE'
+              when tablekind = 'P' then 'PROCEDURE'
+              when tablekind = 'F' then 'FUNCTION'
+              when tablekind = 'O' then 'NO PI TABLE''
+              else tablekind end as table_type_desc,
+         createtimestamp as created_at
+  FROM dbc.tablesv
+  WHERE databasename = '{{.database_name}}' order by 1
+type: tool

@@ -1,16 +1,59 @@
 package tools
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-
-	"gopkg.in/yaml.v3"
+    "fmt"
+    "os"
+    "path/filepath"
+    "strings"
+    "gopkg.in/yaml.v3"
 )
+// GlossaryResource represents a glossary resource loaded from YAML
+type GlossaryResource struct {
+	Type        string `yaml:"type" json:"type"`
+	Subtype     string `yaml:"subtype" json:"subtype"`
+	Description string `yaml:"description" json:"description"`
+	Resource    struct {
+		Words []struct {
+			Word        string   `yaml:"word" json:"word"`
+			Synonyms    []string `yaml:"synonyms" json:"synonyms"`
+			Description string   `yaml:"description" json:"description"`
+		} `yaml:"words" json:"words"`
+	} `yaml:"resource" json:"resource"`
+}
+
+// LoadGlossaryResourcesFromDirectory loads all glossary resources from a directory
+func LoadGlossaryResourcesFromDirectory(dir string) ([]GlossaryResource, error) {
+	var resources []GlossaryResource
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return resources, nil // No directory, return empty
+	}
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && (strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			var res GlossaryResource
+			if err := yaml.Unmarshal(data, &res); err != nil {
+				return nil // skip non-resource files
+			}
+			if res.Type == "resource" && res.Subtype == "glossary" {
+				resources = append(resources, res)
+			}
+		}
+		return nil
+	})
+	return resources, err
+}
 
 // ToolDefinition represents a tool loaded from YAML
 type ToolDefinition struct {
+	Type              string               `yaml:"type" json:"type"`
 	Name              string               `yaml:"name" json:"name"`
 	Description       string               `yaml:"description" json:"description"`
 	Parameters        map[string]Parameter `yaml:"parameters" json:"parameters"`
@@ -55,6 +98,21 @@ func LoadToolsFromDirectory(dir string) ([]ToolDefinition, error) {
 				return nil
 			}
 
+			// Only load files with type: tool
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil // skip unreadable files
+			}
+			var quickCheck struct {
+				Type string `yaml:"type"`
+			}
+			if err := yaml.Unmarshal(data, &quickCheck); err != nil {
+				return nil // skip invalid yaml
+			}
+			if quickCheck.Type != "tool" {
+				return nil // skip non-tool files
+			}
+
 			tool, err := loadToolFromFile(path)
 			if err != nil {
 				return fmt.Errorf("error loading %s: %w", path, err)
@@ -81,11 +139,14 @@ func loadToolFromFile(filepath string) (ToolDefinition, error) {
 	}
 
 	// Validate required fields
+	if tool.Type != "tool" {
+		return tool, fmt.Errorf("tool YAML must have type: tool (got '%s') in %s", tool.Type, filepath)
+	}
 	if tool.Name == "" {
-		return tool, fmt.Errorf("tool name is required")
+		return tool, fmt.Errorf("tool name is required in %s", filepath)
 	}
 	if tool.SQLTemplate == "" {
-		return tool, fmt.Errorf("sql_template is required")
+		return tool, fmt.Errorf("sql_template is required in %s", filepath)
 	}
 
 	return tool, nil

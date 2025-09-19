@@ -20,11 +20,27 @@ func addToolToServer(mcpServer *server.MCPServer, toolDef tools.ToolDefinition) 
 	var handler func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
 	if toolDef.Name == "connection_status" {
 		handler = connectionStatusHandler
+	} else if toolDef.Name == "glossary_resource" {
+		handler = glossaryResourceHandler
 	} else {
 		handler = createToolHandler(toolDef)
 	}
 	mcpServer.AddTool(convertToolDefinition(toolDef), handler)
 	slog.Info("Registered tool", "tool", toolDef.Name)
+}
+
+// Handler for glossary_resource tool
+func glossaryResourceHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	slog.Info("Handling glossary_resource tool call")
+	if len(loadedGlossaries) == 0 {
+		return mcp.NewToolResultError("No glossary resources loaded"), nil
+	}
+	// For now, just return the first loaded glossary
+	resultJSON, err := json.Marshal(loadedGlossaries[0].Resource.Words)
+	if err != nil {
+		return mcp.NewToolResultError("failed to marshal glossary resource: " + err.Error()), nil
+	}
+	return mcp.NewToolResultText(string(resultJSON)), nil
 }
 
 func convertToolDefinition(toolDef tools.ToolDefinition) mcp.Tool {

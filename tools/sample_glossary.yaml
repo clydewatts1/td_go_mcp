@@ -1,0 +1,22 @@
+type: resource
+subtype: glossary
+description: Sample glossary resource for testing and demonstration.
+parameters: {}
+return_type: array
+resource:
+  words:
+    - word: "server"
+      synonyms: ["host", "backend"]
+      description: "A computer or program that provides services to other computers or clients."
+    - word: "client"
+      synonyms: ["consumer", "frontend"]
+      description: "A computer or program that requests services from a server."
+    - word: "API"
+      synonyms: ["interface", "endpoint"]
+      description: "A set of functions and protocols for building and interacting with software applications."
+    - word: "latency"
+      synonyms: ["delay", "lag"]
+      description: "The time it takes for a data packet to move from source to destination."
+    - word: "bandwidth"
+      synonyms: ["throughput", "capacity"]
+      description: "The maximum rate of data transfer across a given path."
