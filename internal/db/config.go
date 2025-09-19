@@ -166,3 +166,27 @@ func (db *DB) ExecuteQuery(query string) ([]map[string]interface{}, error) {
 
 	return results, nil
 }
+
+// DSN returns the configured DSN string
+func (db *DB) DSN() string {
+	if db.config != nil {
+		return db.config.DSN
+	}
+	return ""
+}
+
+// Type returns the configured driver type
+func (db *DB) Type() string {
+	if db.config != nil {
+		return db.config.Driver
+	}
+	return ""
+}
+
+// Ping checks the database connection
+func (db *DB) Ping() error {
+	if db.conn != nil {
+		return db.conn.Ping()
+	}
+	return fmt.Errorf("no database connection")
+}
