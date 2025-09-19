@@ -96,7 +96,7 @@ func main() {
 func addToolToServer(mcpServer *server.MCPServer, toolDef tools.ToolDefinition) {
 	// Convert tool definition to mcp.Tool
 	mcpTool := convertToolDefinition(toolDef)
-	
+
 	// Create handler function for this tool
 	handler := createToolHandler(toolDef)
 
@@ -108,7 +108,7 @@ func addToolToServer(mcpServer *server.MCPServer, toolDef tools.ToolDefinition) 
 func addPromptToServer(mcpServer *server.MCPServer, promptDef tools.PromptDefinition) {
 	// Convert prompt definition to mcp.Prompt
 	mcpPrompt := convertPromptDefinition(promptDef)
-	
+
 	// Create handler function for this prompt
 	handler := createPromptHandler(promptDef)
 
@@ -222,8 +222,32 @@ func createToolHandler(toolDef tools.ToolDefinition) func(context.Context, mcp.C
 			// Return the generated SQL instead of executing it
 			return mcp.NewToolResultText("Generated SQL:\n" + sql), nil
 		} else {
-			// Execute SQL against database and return results
+			// Execute SQL against database or return test message
 			if database == nil {
+				// If no database connection and test message is configured, use test data
+				if toolDef.ReturnTestMessage != "" {
+					testData, err := loadTestMessage(toolDef.ReturnTestMessage)
+					if err != nil {
+						return mcp.NewToolResultText(fmt.Sprintf("Database connection not available and failed to load test data: %v\n\nGenerated SQL:\n%s", err, sql)), nil
+					}
+
+					// Return test data with metadata
+					result := map[string]interface{}{
+						"data":   testData,
+						"source": "test_message",
+						"file":   toolDef.ReturnTestMessage,
+						"sql":    sql,
+					}
+
+					resultJSON, err := json.Marshal(result)
+					if err != nil {
+						return mcp.NewToolResultError(fmt.Sprintf("failed to marshal test results: %v", err)), nil
+					}
+
+					return mcp.NewToolResultText(string(resultJSON)), nil
+				}
+
+				// No test data available
 				return mcp.NewToolResultText("Database connection not available. Use '__preview': true to see generated SQL.\n\nGenerated SQL:\n" + sql), nil
 			}
 
@@ -245,6 +269,21 @@ func createToolHandler(toolDef tools.ToolDefinition) func(context.Context, mcp.C
 			return mcp.NewToolResultText(string(resultJSON)), nil
 		}
 	}
+}
+
+// loadTestMessage loads test data from a JSON file
+func loadTestMessage(filepath string) (interface{}, error) {
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read test message file %s: %w", filepath, err)
+	}
+
+	var result interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse test message JSON from %s: %w", filepath, err)
+	}
+
+	return result, nil
 }
 
 // Helper function to check if a slice contains a string
@@ -270,7 +309,7 @@ func convertPromptDefinition(promptDef tools.PromptDefinition) mcp.Prompt {
 				mcp.ArgumentDescription(param.Description),
 			}
 
-			// Check if this parameter is required (we'll use a simple heuristic - 
+			// Check if this parameter is required (we'll use a simple heuristic -
 			// parameters without defaults are considered required)
 			if param.Default == nil {
 				argumentOpts = append(argumentOpts, mcp.RequiredArgument())

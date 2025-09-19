@@ -1,0 +1,20 @@
+[
+  {
+    "table_name": "users",
+    "record_count": 1250,
+    "date_filter": "2024-01-15",
+    "status": "active"
+  },
+  {
+    "table_name": "orders", 
+    "record_count": 8930,
+    "date_filter": null,
+    "status": "all"
+  },
+  {
+    "table_name": "products",
+    "record_count": 456,
+    "date_filter": "2024-01-01",
+    "status": "available"
+  }
+]

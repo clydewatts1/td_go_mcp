@@ -13,6 +13,7 @@ parameters:
 required:
   - table_name
 return_type: integer
+return_test_message: test_data/count_records.json
 sql_template: |
   SELECT COUNT(*) as record_count
   FROM {{.table_name}}

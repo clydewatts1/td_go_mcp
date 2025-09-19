@@ -11,6 +11,7 @@ parameters:
 required:
   - user_id
 return_type: object
+return_test_message: test_data/get_user_by_id.json
 sql_template: |
   SELECT 
     user_id,

@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	_ "github.com/alexbrainman/odbc"
 )
 
@@ -24,6 +26,15 @@ func LoadConfig() *Config {
 	config := &Config{
 		Driver: "odbc",
 		DSN:    "teradw", // Default Teradata DSN
+	}
+
+	// Load from YAML file if present
+	yamlFile := "database.yaml"
+	if _, err := os.Stat(yamlFile); err == nil {
+		data, err := os.ReadFile(yamlFile)
+		if err == nil {
+			_ = yaml.Unmarshal(data, config)
+		}
 	}
 
 	// Override from environment variables

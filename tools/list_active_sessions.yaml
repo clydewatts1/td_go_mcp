@@ -11,6 +11,7 @@ parameters:
     default: "user"
 required: []
 return_type: array
+return_test_message: test_data/list_active_sessions.json
 sql_template: |
   SELECT 
     session_id,

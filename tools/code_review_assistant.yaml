@@ -3,15 +3,15 @@ name: code_review_assistant
 description: "Assist with code review by providing structured feedback and suggestions"
 prompt: |
   You are an experienced software developer conducting a code review.
-  
+
   Please review the following {{language}} code and provide feedback:
-  
+
   ```{{language}}
   {{code}}
   ```
-  
+
   Focus areas: {{focus_areas}}
-  
+
   Please provide:
   1. **Code Quality Assessment**: Rate the overall code quality and explain your reasoning
   2. **Issues Found**: List any bugs, security vulnerabilities, or logic errors

@@ -1,0 +1,29 @@
+[
+  {
+    "session_id": "sess_12345",
+    "user_id": "user_001",
+    "username": "alice_admin",
+    "user_type": "admin",
+    "started_at": "2024-01-15T09:15:00Z",
+    "last_activity": "2024-01-15T14:30:00Z",
+    "ip_address": "192.168.1.100"
+  },
+  {
+    "session_id": "sess_67890",
+    "user_id": "user_002", 
+    "username": "bob_user",
+    "user_type": "user",
+    "started_at": "2024-01-15T10:45:00Z",
+    "last_activity": "2024-01-15T14:25:00Z",
+    "ip_address": "192.168.1.101"
+  },
+  {
+    "session_id": "sess_11111",
+    "user_id": "user_003",
+    "username": "charlie_guest", 
+    "user_type": "guest",
+    "started_at": "2024-01-15T13:20:00Z",
+    "last_activity": "2024-01-15T14:20:00Z",
+    "ip_address": "192.168.1.102"
+  }
+]

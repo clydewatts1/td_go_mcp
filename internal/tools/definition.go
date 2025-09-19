@@ -11,12 +11,13 @@ import (
 
 // ToolDefinition represents a tool loaded from YAML
 type ToolDefinition struct {
-	Name        string               `yaml:"name" json:"name"`
-	Description string               `yaml:"description" json:"description"`
-	Parameters  map[string]Parameter `yaml:"parameters" json:"parameters"`
-	ReturnType  string               `yaml:"return_type" json:"return_type"`
-	SQLTemplate string               `yaml:"sql_template" json:"sql_template"`
-	Required    []string             `yaml:"required" json:"required"`
+	Name              string               `yaml:"name" json:"name"`
+	Description       string               `yaml:"description" json:"description"`
+	Parameters        map[string]Parameter `yaml:"parameters" json:"parameters"`
+	ReturnType        string               `yaml:"return_type" json:"return_type"`
+	SQLTemplate       string               `yaml:"sql_template" json:"sql_template"`
+	Required          []string             `yaml:"required" json:"required"`
+	ReturnTestMessage string               `yaml:"return_test_message,omitempty" json:"return_test_message,omitempty"`
 }
 
 // PromptDefinition represents a prompt loaded from YAML
@@ -53,7 +54,7 @@ func LoadToolsFromDirectory(dir string) ([]ToolDefinition, error) {
 			if isPromptFile(path) {
 				return nil
 			}
-			
+
 			tool, err := loadToolFromFile(path)
 			if err != nil {
 				return fmt.Errorf("error loading %s: %w", path, err)
@@ -153,11 +154,11 @@ func isPromptFile(filepath string) bool {
 	var quickCheck struct {
 		Type string `yaml:"type"`
 	}
-	
+
 	if err := yaml.Unmarshal(data, &quickCheck); err != nil {
 		return false
 	}
-	
+
 	return quickCheck.Type == "prompt"
 }
 
