@@ -2,6 +2,8 @@ package mcp
 
 import (
 	"encoding/json"
+
+	"golang.org/x/exp/slog"
 )
 
 type Request struct {
@@ -11,6 +13,10 @@ type Request struct {
 	Params  *json.RawMessage `json:"params,omitempty"`
 }
 
+func (r *Request) Log() {
+	slog.Debug("[protocol] MCP Request", "jsonrpc", r.JSONRPC, "id", r.ID, "method", r.Method, "params", r.Params)
+}
+
 type Response struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id,omitempty"`
@@ -18,9 +24,17 @@ type Response struct {
 	Error   *RespError      `json:"error,omitempty"`
 }
 
+func (r *Response) Log() {
+	slog.Debug("[protocol] MCP Response", "jsonrpc", r.JSONRPC, "id", r.ID, "result", r.Result, "error", r.Error)
+}
+
 type RespError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+}
+
+func (e *RespError) Log() {
+	slog.Error("[protocol] MCP Error", "code", e.Code, "message", e.Message)
 }
 
 type InitializeParams struct {

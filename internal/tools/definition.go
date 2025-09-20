@@ -1,12 +1,15 @@
 package tools
 
 import (
-    "fmt"
-    "os"
-    "path/filepath"
-    "strings"
-    "gopkg.in/yaml.v3"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"golang.org/x/exp/slog"
+	"gopkg.in/yaml.v3"
 )
+
 // GlossaryResource represents a glossary resource loaded from YAML
 type GlossaryResource struct {
 	Type        string `yaml:"type" json:"type"`
@@ -23,31 +26,38 @@ type GlossaryResource struct {
 
 // LoadGlossaryResourcesFromDirectory loads all glossary resources from a directory
 func LoadGlossaryResourcesFromDirectory(dir string) ([]GlossaryResource, error) {
+	slog.Debug("[definition] Loading glossary resources from directory", "dir", dir)
 	var resources []GlossaryResource
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		slog.Warn("[definition] Glossary directory does not exist", "dir", dir)
 		return resources, nil // No directory, return empty
 	}
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			slog.Error("[definition] Error walking glossary directory", "path", path, "error", err)
 			return err
 		}
 		if !info.IsDir() && (strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
 			data, err := os.ReadFile(path)
 			if err != nil {
+				slog.Error("[definition] Failed to read glossary file", "file", path, "error", err)
 				return err
 			}
 			var res GlossaryResource
 			if err := yaml.Unmarshal(data, &res); err != nil {
+				slog.Debug("[definition] Skipping non-resource YAML file", "file", path)
 				return nil // skip non-resource files
 			}
 			if res.Type == "resource" && res.Subtype == "glossary" {
+				slog.Debug("[definition] Loaded glossary resource", "file", path)
 				resources = append(resources, res)
 			}
 		}
 		return nil
 	})
+	slog.Info("[definition] Loaded glossary resources", "count", len(resources))
 	return resources, err
 }
 
@@ -81,47 +91,57 @@ type Parameter struct {
 
 // LoadToolsFromDirectory loads all YAML files from tools/ directory
 func LoadToolsFromDirectory(dir string) ([]ToolDefinition, error) {
+	slog.Debug("[definition] Loading tools from directory", "dir", dir)
 	var tools []ToolDefinition
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		slog.Warn("[definition] Tools directory does not exist", "dir", dir)
 		return tools, nil // No tools directory, return empty
 	}
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			slog.Error("[definition] Error walking tools directory", "path", path, "error", err)
 			return err
 		}
 
 		if !info.IsDir() && (strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
 			// Skip prompt files when loading tools
 			if isPromptFile(path) {
+				slog.Debug("[definition] Skipping prompt file when loading tools", "file", path)
 				return nil
 			}
 
 			// Only load files with type: tool
 			data, err := os.ReadFile(path)
 			if err != nil {
+				slog.Error("[definition] Failed to read tool file", "file", path, "error", err)
 				return nil // skip unreadable files
 			}
 			var quickCheck struct {
 				Type string `yaml:"type"`
 			}
 			if err := yaml.Unmarshal(data, &quickCheck); err != nil {
+				slog.Debug("[definition] Skipping invalid YAML file", "file", path)
 				return nil // skip invalid yaml
 			}
 			if quickCheck.Type != "tool" {
+				slog.Debug("[definition] Skipping non-tool YAML file", "file", path)
 				return nil // skip non-tool files
 			}
 
 			tool, err := loadToolFromFile(path)
 			if err != nil {
+				slog.Error("[definition] Error loading tool from file", "file", path, "error", err)
 				return fmt.Errorf("error loading %s: %w", path, err)
 			}
+			slog.Debug("[definition] Loaded tool", "file", path, "tool", tool.Name)
 			tools = append(tools, tool)
 		}
 		return nil
 	})
 
+	slog.Info("[definition] Loaded tools", "count", len(tools))
 	return tools, err
 }
 
@@ -178,14 +198,17 @@ func (td *ToolDefinition) ToMCPTool() map[string]any {
 
 // LoadPromptsFromDirectory loads all prompt YAML files from tools/ directory
 func LoadPromptsFromDirectory(dir string) ([]PromptDefinition, error) {
+	slog.Debug("[definition] Loading prompts from directory", "dir", dir)
 	var prompts []PromptDefinition
 
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		slog.Warn("[definition] Prompts directory does not exist", "dir", dir)
 		return prompts, nil // No tools directory, return empty
 	}
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			slog.Error("[definition] Error walking prompts directory", "path", path, "error", err)
 			return err
 		}
 
@@ -194,14 +217,17 @@ func LoadPromptsFromDirectory(dir string) ([]PromptDefinition, error) {
 			if isPromptFile(path) {
 				prompt, err := loadPromptFromFile(path)
 				if err != nil {
+					slog.Error("[definition] Error loading prompt from file", "file", path, "error", err)
 					return fmt.Errorf("error loading prompt %s: %w", path, err)
 				}
+				slog.Debug("[definition] Loaded prompt", "file", path, "prompt", prompt.Name)
 				prompts = append(prompts, prompt)
 			}
 		}
 		return nil
 	})
 
+	slog.Info("[definition] Loaded prompts", "count", len(prompts))
 	return prompts, err
 }
 

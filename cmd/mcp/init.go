@@ -23,24 +23,28 @@ var (
 )
 
 func init() {
-	// Determine the base path of the executable
-	exePath, err := os.Executable()
-	if err != nil {
-		slog.Error("Failed to get executable path", "err", err)
-		os.Exit(1)
-	}
-	// Check if running with "go run"
-	if strings.Contains(exePath, "go-build") || strings.Contains(exePath, "exe\\main.exe") {
-		// Likely running with "go run", use current working directory
-		wd, err := os.Getwd()
+	// Determine the base path from the environment variable if available
+	basePath = os.Getenv("TD_GO_MCP_PROJECT_ROOT")
+	if basePath == "" {
+		// Fallback to executable's directory
+		exePath, err := os.Executable()
 		if err != nil {
-			slog.Error("Failed to get working directory", "err", err)
+			slog.Error("Failed to get executable path", "err", err)
 			os.Exit(1)
 		}
-		basePath = wd
-	} else {
-		// Running as a compiled binary, use the executable's directory
-		basePath = filepath.Dir(exePath)
+		// Check if running with "go run"
+		if strings.Contains(exePath, "go-build") || strings.Contains(exePath, "exe\\main.exe") {
+			// Likely running with "go run", use current working directory
+			wd, err := os.Getwd()
+			if err != nil {
+				slog.Error("Failed to get working directory", "err", err)
+				os.Exit(1)
+			}
+			basePath = wd
+		} else {
+			// Running as a compiled binary, use the executable's directory
+			basePath = filepath.Dir(exePath)
+		}
 	}
 
 	// Set up logging directory and slog logger
@@ -57,6 +61,10 @@ func init() {
 	}
 	logger = slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{AddSource: true}))
 	slog.SetDefault(logger)
+
+	// Log the environment variable and the determined base path for debugging
+	logger.Info("Checking for TD_GO_MCP_PROJECT_ROOT environment variable", "variable", os.Getenv("TD_GO_MCP_PROJECT_ROOT"))
+	logger.Info("Using base path for resources", "path", basePath)
 
 	// Load glossary resources from tools
 	glossaryPath := filepath.Join(basePath, "tools")

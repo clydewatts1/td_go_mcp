@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+
+	"golang.org/x/exp/slog"
 )
 
 // SQLProcessor handles SQL template processing and parameter substitution
@@ -12,40 +14,45 @@ type SQLProcessor struct {
 	tool ToolDefinition
 }
 
+// Add detailed logging to all major methods
+
 // NewSQLProcessor creates a new SQL processor for the given tool
 func NewSQLProcessor(tool ToolDefinition) *SQLProcessor {
+	slog.Debug("[processor] Creating new SQLProcessor", "tool", tool.Name)
 	return &SQLProcessor{tool: tool}
 }
 
 // ProcessTemplate fills the SQL template with provided parameters
 func (p *SQLProcessor) ProcessTemplate(params map[string]any) (string, error) {
 	// Create template with custom functions
+	slog.Debug("[processor] Processing SQL template", "tool", p.tool.Name, "params", params)
 	tmpl, err := template.New(p.tool.Name).Funcs(template.FuncMap{
 		"escape": escapeSQL,
 	}).Parse(p.tool.SQLTemplate)
 	if err != nil {
+		slog.Error("[processor] Invalid SQL template", "tool", p.tool.Name, "error", err)
 		return "", fmt.Errorf("invalid SQL template: %w", err)
 	}
 
 	// Merge parameters with defaults
 	processedParams := make(map[string]any)
-
 	// Set defaults first
 	for name, param := range p.tool.Parameters {
 		if param.Default != nil {
 			processedParams[name] = param.Default
 		}
 	}
-
 	// Override with provided parameters
 	for key, value := range params {
 		processedParams[key] = value
 	}
+	slog.Debug("[processor] Final parameters for template", "tool", p.tool.Name, "params", processedParams)
 
 	// Execute template
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, processedParams)
 	if err != nil {
+		slog.Error("[processor] Template execution failed", "tool", p.tool.Name, "error", err)
 		return "", fmt.Errorf("template execution failed: %w", err)
 	}
 
@@ -53,27 +60,30 @@ func (p *SQLProcessor) ProcessTemplate(params map[string]any) (string, error) {
 	sql := strings.TrimSpace(buf.String())
 	sql = strings.ReplaceAll(sql, "\n\n", "\n")
 
+	slog.Debug("[processor] Generated SQL", "tool", p.tool.Name, "sql", sql)
 	return sql, nil
 }
 
 // ValidateParameters checks if required parameters are provided and types match
 func (p *SQLProcessor) ValidateParameters(params map[string]any) error {
+	slog.Debug("[processor] Validating parameters", "tool", p.tool.Name, "params", params)
 	// Check required parameters
 	for _, required := range p.tool.Required {
 		if _, exists := params[required]; !exists {
+			slog.Error("[processor] Missing required parameter", "tool", p.tool.Name, "param", required)
 			return fmt.Errorf("missing required parameter: %s", required)
 		}
 	}
-
 	// Basic type validation
 	for name, value := range params {
 		if paramDef, exists := p.tool.Parameters[name]; exists {
 			if !isValidType(value, paramDef.Type) {
+				slog.Error("[processor] Parameter type mismatch", "tool", p.tool.Name, "param", name, "expected", paramDef.Type, "got", value)
 				return fmt.Errorf("parameter %s: expected %s, got %T", name, paramDef.Type, value)
 			}
 		}
 	}
-
+	slog.Debug("[processor] Parameter validation successful", "tool", p.tool.Name)
 	return nil
 }
 

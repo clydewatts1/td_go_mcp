@@ -5,7 +5,7 @@ A database-centric MCP (Model Context Protocol) server in Go that provides dynam
 ## Features
 
 - **Dynamic Tool Loading**: Tools are defined in YAML files and loaded at runtime
-- **Database Integration**: Connect to databases via ODBC (default: Teradata DSN 'teradw')
+- **Database Integration**: Connect to databases via ODBC (default: Teradata DSN 'CLEARSCAPE')
 - **SQL Template Processing**: Template-based SQL generation with parameter substitution
 - **MCP Protocol**: Full stdio-based MCP server with `initialize`, `tools/list`, and `tools/call`
 - **HTTP Server**: Health check and info endpoints
@@ -103,7 +103,7 @@ Create or edit `%APPDATA%\gemini\mcp_servers.json`:
       "args": ["run", "./cmd/mcp"],
       "cwd": "C:/Users/YOUR_USERNAME/Projects/td_go_mcp",
       "env": {
-        "DB_DSN": "teradw"
+        "DB_DSN": "CLEARSCAPE"
       }
     }
   }
@@ -120,7 +120,7 @@ Create or edit `~/.config/gemini/mcp_servers.json`:
       "args": ["run", "./cmd/mcp"],
       "cwd": "/path/to/your/td_go_mcp",
       "env": {
-        "DB_DSN": "teradw"
+        "DB_DSN": "CLEARSCAPE"
       }
     }
   }
@@ -214,7 +214,7 @@ Invoke-WebRequest http://localhost:8080/
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DB_DRIVER` | Database driver | `odbc` |
-| `DB_DSN` | ODBC Data Source Name | `teradw` |
+| `DB_DSN` | ODBC Data Source Name | `CLEARSCAPE` |
 | `DB_CONNECTION_STRING` | Full connection string | - |
 | `DB_HOST` | Database host | - |
 | `DB_PORT` | Database port | - |

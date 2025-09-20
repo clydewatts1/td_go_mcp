@@ -17,29 +17,35 @@ import (
 // Place tool handler functions here, e.g. createToolHandler(...)
 
 func addToolToServer(mcpServer *server.MCPServer, toolDef tools.ToolDefinition) {
+	slog.Debug("[tool_handlers] Adding tool to server", "tool", toolDef.Name)
 	var handler func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
 	if toolDef.Name == "connection_status" {
+		slog.Debug("[tool_handlers] Using connection_statusHandler", "tool", toolDef.Name)
 		handler = connectionStatusHandler
 	} else if toolDef.Name == "glossary_resource" {
+		slog.Debug("[tool_handlers] Using glossaryResourceHandler", "tool", toolDef.Name)
 		handler = glossaryResourceHandler
 	} else {
+		slog.Debug("[tool_handlers] Using createToolHandler", "tool", toolDef.Name)
 		handler = createToolHandler(toolDef)
 	}
 	mcpServer.AddTool(convertToolDefinition(toolDef), handler)
-	slog.Info("Registered tool", "tool", toolDef.Name)
+	slog.Info("[tool_handlers] Registered tool", "tool", toolDef.Name)
 }
 
 // Handler for glossary_resource tool
 func glossaryResourceHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	slog.Info("Handling glossary_resource tool call")
+	slog.Info("[tool_handlers] Handling glossary_resource tool call")
 	if len(loadedGlossaries) == 0 {
+		slog.Warn("[tool_handlers] No glossary resources loaded")
 		return mcp.NewToolResultError("No glossary resources loaded"), nil
 	}
-	// For now, just return the first loaded glossary
 	resultJSON, err := json.Marshal(loadedGlossaries[0].Resource.Words)
 	if err != nil {
+		slog.Error("[tool_handlers] Failed to marshal glossary resource", "error", err)
 		return mcp.NewToolResultError("failed to marshal glossary resource: " + err.Error()), nil
 	}
+	slog.Debug("[tool_handlers] Returning glossary resource JSON", "json", string(resultJSON))
 	return mcp.NewToolResultText(string(resultJSON)), nil
 }
 
@@ -98,12 +104,14 @@ func convertToolDefinition(toolDef tools.ToolDefinition) mcp.Tool {
 
 func createToolHandler(toolDef tools.ToolDefinition) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		slog.Info("Handling tool call", "tool", toolDef.Name)
+		slog.Info("[tool_handlers] Handling tool call", "tool", toolDef.Name)
 		processor, exists := processors[toolDef.Name]
 		if !exists {
+			slog.Error("[tool_handlers] Tool processor not found", "tool", toolDef.Name)
 			return mcp.NewToolResultError(fmt.Sprintf("tool processor not found: %s", toolDef.Name)), nil
 		}
 		args := req.GetArguments()
+		slog.Debug("[tool_handlers] Tool call arguments", "args", args)
 		params := make(map[string]interface{})
 		for paramName := range toolDef.Parameters {
 			if value, exists := args[paramName]; exists {
@@ -118,22 +126,29 @@ func createToolHandler(toolDef tools.ToolDefinition) func(context.Context, mcp.C
 			delete(params, "__preview")
 		}
 		if err := processor.ValidateParameters(params); err != nil {
+			slog.Error("[tool_handlers] Parameter validation failed", "error", err, "params", params)
 			return mcp.NewToolResultError(fmt.Sprintf("parameter validation failed: %v", err)), nil
 		}
 		sql, err := processor.ProcessTemplate(params)
 		if err != nil {
+			slog.Error("[tool_handlers] SQL template processing failed", "error", err, "params", params)
 			return mcp.NewToolResultError(fmt.Sprintf("SQL template processing failed: %v", err)), nil
 		}
+		slog.Debug("[tool_handlers] Generated SQL", "sql", sql)
 		if strings.TrimSpace(sql) == "" {
+			slog.Error("[tool_handlers] Generated SQL is empty", "tool", toolDef.Name)
 			return mcp.NewToolResultError("generated SQL is empty"), nil
 		}
 		if preview {
+			slog.Info("[tool_handlers] Preview mode enabled, returning generated SQL")
 			return mcp.NewToolResultText("Generated SQL:\n" + sql), nil
 		} else {
 			if database == nil {
+				slog.Warn("[tool_handlers] Database connection not available, using test message or preview", "tool", toolDef.Name)
 				if toolDef.ReturnTestMessage != "" {
 					testData, err := loadTestMessage(toolDef.ReturnTestMessage)
 					if err != nil {
+						slog.Error("[tool_handlers] Failed to load test message", "file", toolDef.ReturnTestMessage, "error", err)
 						return mcp.NewToolResultText(fmt.Sprintf("Database connection not available and failed to load test data: %v\n\nGenerated SQL:\n%s", err, sql)), nil
 					}
 					result := map[string]interface{}{
@@ -144,14 +159,17 @@ func createToolHandler(toolDef tools.ToolDefinition) func(context.Context, mcp.C
 					}
 					resultJSON, err := json.Marshal(result)
 					if err != nil {
+						slog.Error("[tool_handlers] Failed to marshal test results", "error", err)
 						return mcp.NewToolResultError(fmt.Sprintf("failed to marshal test results: %v", err)), nil
 					}
+					slog.Debug("[tool_handlers] Returning test message result JSON", "json", string(resultJSON))
 					return mcp.NewToolResultText(string(resultJSON)), nil
 				}
 				return mcp.NewToolResultText("Database connection not available. Use '__preview': true to see generated SQL.\n\nGenerated SQL:\n" + sql), nil
 			}
 			rows, err := database.ExecuteQuery(sql)
 			if err != nil {
+				slog.Error("[tool_handlers] SQL execution failed", "error", err, "sql", sql)
 				return mcp.NewToolResultError(fmt.Sprintf("SQL execution failed: %v", err)), nil
 			}
 			resultJSON, err := json.Marshal(map[string]interface{}{
@@ -160,8 +178,10 @@ func createToolHandler(toolDef tools.ToolDefinition) func(context.Context, mcp.C
 				"sql":   sql,
 			})
 			if err != nil {
+				slog.Error("[tool_handlers] Failed to marshal results", "error", err)
 				return mcp.NewToolResultError(fmt.Sprintf("failed to marshal results: %v", err)), nil
 			}
+			slog.Debug("[tool_handlers] Returning SQL execution result JSON", "json", string(resultJSON))
 			return mcp.NewToolResultText(string(resultJSON)), nil
 		}
 	}

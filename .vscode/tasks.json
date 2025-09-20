@@ -121,7 +121,7 @@
       "options": {
         "cwd": ".",
         "env": {
-          "DB_DSN": "teradw",
+          "DB_DSN": "CLEARSCAPE",
           "DB_DRIVER": "odbc"
         }
       },

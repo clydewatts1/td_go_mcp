@@ -8,7 +8,7 @@ MCP server scaffold in Go (Windows/PowerShell). Uses stdio command `go run ./cmd
 ## Requirements
 This MCP server connects to databases and performs operations based on MCP tool calls.
 - YAML-based tool definitions in the `tools/` directory
-- Database connection via ODBC (default: Teradata DSN 'teradw')  
+- Database connection via ODBC (default: Teradata DSN 'CLEARSCAPE')  
 - SQL template processing with parameter substitution
 - Preview mode for SQL generation without execution
 - Comprehensive error handling and validation

@@ -25,7 +25,7 @@ type Config struct {
 func LoadConfig() *Config {
 	config := &Config{
 		Driver: "odbc",
-		DSN:    "teradw", // Default Teradata DSN
+		DSN:    "CLEARSCAPE", // Default Teradata DSN
 	}
 
 	// Load from YAML file if present

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"td_go_mcp/internal/tools"
+
+	"golang.org/x/exp/slog"
 )
 
 type ServerInfo struct {
@@ -18,19 +20,22 @@ type ServerInfo struct {
 }
 
 func RegisterRoutes(mux *http.ServeMux) {
+	slog.Debug("[server] Registering HTTP routes")
 	mux.HandleFunc("/", handleRoot)
 	mux.HandleFunc("/healthz", handleHealth)
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {
-	// Load tools count
+	slog.Info("[server] Handling root endpoint request")
 	loadedTools, err := tools.LoadToolsFromDirectory("tools")
 	toolCount := 0
 	status := "ok"
 	if err != nil {
 		status = "warning: " + err.Error()
+		slog.Error("[server] Error loading tools from directory", "error", err)
 	} else {
 		toolCount = len(loadedTools)
+		slog.Debug("[server] Loaded tools for root endpoint", "count", toolCount)
 	}
 
 	info := ServerInfo{
@@ -43,12 +48,21 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(info); err != nil {
+		slog.Error("[server] Failed to encode root endpoint response", "error", err)
 		http.Error(w, fmt.Sprintf("Failed to encode response: %v", err), http.StatusInternalServerError)
+	} else {
+		slog.Info("[server] Root endpoint response sent", "info", info)
 	}
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("[server] Handling healthz endpoint request")
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("ok"))
+	_, err := w.Write([]byte("ok"))
+	if err != nil {
+		slog.Error("[server] Failed to write healthz response", "error", err)
+	} else {
+		slog.Debug("[server] Healthz response sent")
+	}
 }

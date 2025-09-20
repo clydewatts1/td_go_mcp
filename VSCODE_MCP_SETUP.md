@@ -19,7 +19,7 @@ Create: `%APPDATA%\Code\User\mcp.json`
       "args": ["run", "./cmd/mcp"],
       "cwd": "C:/Users/cw171001/OneDrive - Teradata/Documents/GitHub/td_go_mcp/td_go_mcp",
       "env": {
-        "DB_DSN": "teradw",
+        "DB_DSN": "CLEARSCAPE",
         "DB_DRIVER": "odbc"
       }
     }
@@ -37,7 +37,7 @@ In VS Code User Settings:
       "args": ["run", "./cmd/mcp"],
       "cwd": "C:/Users/cw171001/OneDrive - Teradata/Documents/GitHub/td_go_mcp/td_go_mcp",
       "env": {
-        "DB_DSN": "teradw",
+        "DB_DSN": "CLEARSCAPE",
         "DB_DRIVER": "odbc"
       }
     }
@@ -82,5 +82,5 @@ Follow these steps to confirm the MCP server is connected and usable from VS Cod
   - Review the Output panel for any path or permission errors launching `mcp.exe`.
 
 Notes:
-- For non-preview SQL execution, configure an ODBC DSN named `teradw` or adjust `DB_DSN`.
+- For non-preview SQL execution, configure an ODBC DSN named `CLEARSCAPE` or adjust `DB_DSN`.
 - Preview mode is available by adding `"__preview": true` to tool call arguments.
