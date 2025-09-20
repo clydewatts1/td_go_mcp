@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mark3labs/mcp-go/server"
+	mcp_golang "github.com/metoro-io/mcp-golang"
 	"golang.org/x/exp/slog"
 )
 
@@ -35,10 +35,7 @@ func main() {
 	}()
 
 	slog.Info("[main] Creating MCP server instance")
-	mcpServer := server.NewMCPServer("td-go-mcp", "0.2.0",
-		server.WithToolCapabilities(true),
-		server.WithPromptCapabilities(true),
-	)
+	mcpServer := mcp_golang.NewServer("td-go-mcp", "0.2.0")
 
 	slog.Info("[main] Registering tools and prompts with MCP server", "tools", len(loadedTools), "prompts", len(loadedPrompts))
 	for _, toolDef := range loadedTools {
@@ -51,7 +48,7 @@ func main() {
 	}
 
 	slog.Info("[main] Starting MCP server with stdio transport...")
-	if err := server.ServeStdio(mcpServer); err != nil {
+	if err := mcpServer.Start(); err != nil {
 		slog.Error("[main] Server error", "err", err)
 		os.Exit(1)
 	}
