@@ -84,9 +84,10 @@ type PromptDefinition struct {
 
 // Parameter defines input parameter schema
 type Parameter struct {
-	Type        string `yaml:"type" json:"type"`
-	Description string `yaml:"description" json:"description"`
-	Default     any    `yaml:"default,omitempty" json:"default,omitempty"`
+	Type        string   `yaml:"type" json:"type"`
+	Description string   `yaml:"description" json:"description"`
+	Default     any      `yaml:"default,omitempty" json:"default,omitempty"`
+	Enum        []string `yaml:"enum,omitempty" json:"enum,omitempty"`
 }
 
 // LoadToolsFromDirectory loads all YAML files from tools/ directory
@@ -170,30 +171,6 @@ func loadToolFromFile(filepath string) (ToolDefinition, error) {
 	}
 
 	return tool, nil
-}
-
-// ToMCPTool converts ToolDefinition to MCP Tool format
-func (td *ToolDefinition) ToMCPTool() map[string]any {
-	properties := make(map[string]any)
-	for name, param := range td.Parameters {
-		properties[name] = map[string]any{
-			"type":        param.Type,
-			"description": param.Description,
-		}
-		if param.Default != nil {
-			properties[name].(map[string]any)["default"] = param.Default
-		}
-	}
-
-	return map[string]any{
-		"name":        td.Name,
-		"description": td.Description,
-		"inputSchema": map[string]any{
-			"type":       "object",
-			"properties": properties,
-			"required":   td.Required,
-		},
-	}
 }
 
 // LoadPromptsFromDirectory loads all prompt YAML files from tools/ directory

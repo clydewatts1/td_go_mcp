@@ -20,19 +20,31 @@ $serverConfig = @{
     }
 }
 
-$config = @{}
+$config = $null
 if (Test-Path $ConfigPath) {
     $content = Get-Content $ConfigPath -Raw
     if (-not [string]::IsNullOrWhiteSpace($content)) {
-        $config = $content | ConvertFrom-Json -ErrorAction SilentlyContinue
+        try {
+            $config = $content | ConvertFrom-Json
+        }
+        catch {
+            Write-Warning "Failed to parse existing config file. Creating new one."
+        }
     }
 }
 
-if ($null -eq $config.servers) {
-    $config | Add-Member -MemberType NoteProperty -Name 'servers' -Value @{}
+# If config is null or doesn't have servers, create a new hashtable
+if ($null -eq $config -or $null -eq $config.servers) {
+    $config = @{
+        servers = @{}
+    }
 }
 
-$config.servers['td-go-mcp'] = $serverConfig
+# Ensure servers is a hashtable
+if ($config.servers -isnot [hashtable]) {
+    $config.servers = @{}
+}
+
 $config.servers['td-go-mcp'] = $serverConfig
 
 $config | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigPath -Encoding UTF8 -Force

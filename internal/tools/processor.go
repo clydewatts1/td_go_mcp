@@ -11,7 +11,8 @@ import (
 
 // SQLProcessor handles SQL template processing and parameter substitution
 type SQLProcessor struct {
-	tool ToolDefinition
+	tool     ToolDefinition
+	ToolName string
 }
 
 // Add detailed logging to all major methods
@@ -19,7 +20,10 @@ type SQLProcessor struct {
 // NewSQLProcessor creates a new SQL processor for the given tool
 func NewSQLProcessor(tool ToolDefinition) *SQLProcessor {
 	slog.Debug("[processor] Creating new SQLProcessor", "tool", tool.Name)
-	return &SQLProcessor{tool: tool}
+	return &SQLProcessor{
+		tool:     tool,
+		ToolName: tool.Name,
+	}
 }
 
 // ProcessTemplate fills the SQL template with provided parameters

@@ -10,13 +10,19 @@ A database-centric MCP (Model Context Protocol) server in Go that provides dynam
 - **MCP Protocol**: Full stdio-based MCP server with `initialize`, `tools/list`, and `tools/call`
 - **HTTP Server**: Health check and info endpoints
 - **SQL Preview Mode**: Generate SQL without executing (add `"__preview": true` to tool calls)
+- **Go Test Client**: Comprehensive testing tool for MCP server validation
+- **Comprehensive Testing**: Automated scripts for testing all functionality
+- **VS Code Integration**: Complete setup guide and troubleshooting
+- **Flexible Configuration**: Multiple configuration options (YAML, env vars, .env files)
+- **Advanced Logging**: Configurable logging with file output options
 - **Error Handling**: Comprehensive validation and error reporting
 
 ## Prerequisites
 
-- Go 1.21+
-- Windows PowerShell
+- Go 1.21+ (tested with Go 1.24.0)
+- Windows PowerShell (for scripts and testing)
 - ODBC drivers for your target database (optional)
+- VS Code (for development and MCP integration)
 
 ## Setup
 
@@ -33,23 +39,48 @@ $env:DB_DSN="your_dsn_name"
 $env:DB_CONNECTION_STRING="your_connection_string"
 ```
 
+3. **Configure environment (optional):**
+   Copy `.env.example` to `.env` and modify as needed:
+```powershell
+cp .env.example .env
+```
+
+4. **Configure database connection (optional):**
+   Edit `database.yaml` for database-specific settings:
+```yaml
+driver: odbc
+dsn: CLEARSCAPE
+```
+
 ## Project Structure
 
 ```
 td_go_mcp/
 ├── cmd/
-│   ├── mcp/         # MCP stdio server
-│   └── server/      # HTTP server
+│   ├── mcp/                    # MCP stdio server
+│   ├── server/                 # HTTP server
+│   └── td_go_mcp_test_client/  # Go test client for MCP server
 ├── internal/
-│   ├── db/          # Database connection and config
-│   ├── mcp/         # MCP protocol types and transport
-│   ├── server/      # HTTP server handlers
-│   └── tools/       # Tool definition loading and SQL processing
-├── tools/           # YAML tool definitions
+│   ├── db/                     # Database connection and config
+│   ├── mcp/                    # MCP protocol types and transport
+│   ├── server/                 # HTTP server handlers
+│   ├── tools/                  # Tool definition loading and SQL processing
+│   └── logging/                # Logging configuration
+├── tools/                      # YAML tool definitions
 │   ├── count_records.yaml
 │   ├── get_user_by_id.yaml
-│   └── list_active_sessions.yaml
-└── .vscode/         # VS Code configuration
+│   ├── list_active_sessions.yaml
+│   ├── list_databases.yaml
+│   └── list_of_tables.yaml
+├── mcp_requests/               # Test request JSON files
+│   └── tools_list.json
+├── scripts/                    # PowerShell test and utility scripts
+├── test_data/                  # Test data files
+├── prompts/                    # MCP prompt definitions
+├── .vscode/                    # VS Code configuration
+├── database.yaml               # Database configuration file
+├── .env.example                # Environment variables template
+└── VSCODE_MCP_SETUP.md         # VS Code MCP setup guide
 ```
 
 ## Tool Definition Format
@@ -87,6 +118,15 @@ go run ./cmd/mcp
 ### HTTP Server
 ```powershell
 $env:PORT="8080"; go run ./cmd/server
+```
+
+### Test Client
+```powershell
+# Test tools/list method
+go run ./cmd/td_go_mcp_test_client/main.go mcp_requests/tools_list.json
+
+# Test with custom request file
+go run ./cmd/td_go_mcp_test_client/main.go path/to/your/request.json
 ```
 
 ## Gemini CLI Integration
@@ -141,7 +181,7 @@ gemini
 
 ## VS Code Integration
 
-The project includes VS Code configuration for MCP integration:
+The project includes comprehensive VS Code configuration for MCP integration. See `VSCODE_MCP_SETUP.md` for detailed troubleshooting and setup instructions.
 
 ### Tasks Available:
 - `go: tidy` - Install dependencies
@@ -153,7 +193,13 @@ The project includes VS Code configuration for MCP integration:
 - `test: mcp tools list` - Test MCP tools listing
 
 ### MCP Configuration:
-The `.vscode/mcp.json` file configures VS Code to use this server:
+For VS Code integration, you may need to configure MCP globally. See `VSCODE_MCP_SETUP.md` for detailed instructions including:
+
+- Global MCP configuration in `%APPDATA%\Code\User\mcp.json`
+- VS Code User Settings for `languageModelTools.mcpServers`
+- Required extensions and troubleshooting steps
+
+The `.vscode/mcp.json` file configures VS Code to use this server for the current workspace:
 ```json
 {
   "servers": {
@@ -173,8 +219,41 @@ The `.vscode/mcp.json` file configures VS Code to use this server:
 # Run PowerShell test script
 .\test-endpoints.ps1
 
+# Run comprehensive Gemini CLI tests
+.\test-gemini-cli.ps1
+
 # Or run Go tests
 go test ./...
+```
+
+### Test Client Testing
+The Go test client provides a simple way to test MCP functionality:
+
+```powershell
+# Test tools listing
+go run ./cmd/td_go_mcp_test_client/main.go mcp_requests/tools_list.json
+
+# Create custom test requests in mcp_requests/ directory
+# The client will parse JSON files and send them to the MCP server
+```
+
+### Script-Based Testing
+The `scripts/` directory contains comprehensive test scripts:
+
+```powershell
+# Test all MCP tools
+.\scripts\test-all-tools-test-messages.ps1
+
+# Test Gemini MCP integration
+.\scripts\test-gemini-mcp.ps1
+
+# Test individual tools
+.\scripts\test-mcp-tools-list.ps1
+.\scripts\test-simple-tool-call.ps1
+
+# Debug and diagnostic scripts
+.\scripts\debug-mcp.ps1
+.\scripts\diagnose-vscode-mcp.ps1
 ```
 
 ### Manual MCP Testing
@@ -223,6 +302,21 @@ Invoke-WebRequest http://localhost:8080/
 | `DB_PASSWORD` | Password | - |
 | `PORT` | HTTP server port | `8080` |
 
+## Configuration Files
+
+### Database Configuration
+- `database.yaml`: Database connection settings
+- `.env`: Environment variables (copy from `.env.example`)
+- Supports multiple database drivers (ODBC, PostgreSQL, etc.)
+
+### Test Configuration
+- `mcp_requests/`: Directory containing JSON test request files
+- `test_data/`: Test data files for validation
+- `prompts/`: MCP prompt definitions for advanced usage
+
+### Logging Configuration
+See `LOGGING.md` for detailed logging setup and configuration options.
+
 ## Adding New Tools
 
 1. Create a new YAML file in the `tools/` directory
@@ -244,3 +338,20 @@ To extend functionality:
 - Modify database configuration in `internal/db/config.go`
 - Extend SQL template processing in `internal/tools/processor.go`
 - Add new HTTP endpoints in `internal/server/server.go`
+- Create test requests in `mcp_requests/` for the test client
+- Add test scripts in `scripts/` for automated testing
+- Configure logging in `internal/logging/`
+
+### Test Client Development
+The Go test client (`cmd/td_go_mcp_test_client/`) provides a foundation for:
+- Automated MCP server testing
+- Integration testing with different request types
+- Debugging MCP protocol communication
+- Performance testing and validation
+
+### Scripts and Automation
+The `scripts/` directory contains PowerShell scripts for:
+- Comprehensive testing of all MCP functionality
+- Gemini CLI integration testing
+- VS Code MCP troubleshooting
+- Build and deployment automation

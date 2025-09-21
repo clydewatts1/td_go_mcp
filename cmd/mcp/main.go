@@ -2,27 +2,19 @@
 package main
 
 import (
+	"fmt"
 	"os"
-	"path/filepath"
 
-	mcp_golang "github.com/metoro-io/mcp-golang"
+	mcp "github.com/metoro-io/mcp-golang"
 	"golang.org/x/exp/slog"
+
+	"td_go_mcp/internal/transport/stdio"
 )
 
 // ...globals and init() moved to init.go...
 
 func main() {
 	slog.Info("[main] Starting td-go-mcp server")
-
-	wd, err := os.Getwd()
-	if err != nil {
-		slog.Error("[main] Failed to get working directory", "err", err)
-	} else {
-		slog.Debug("[main] Working directory", "dir", wd)
-	}
-
-	logDirContents("tools")
-	logDirContents("prompts")
 
 	defer func() {
 		slog.Info("[main] Shutting down server, closing database connection if open")
@@ -35,34 +27,52 @@ func main() {
 	}()
 
 	slog.Info("[main] Creating MCP server instance")
-	mcpServer := mcp_golang.NewServer("td-go-mcp", "0.2.0")
 
-	slog.Info("[main] Registering tools and prompts with MCP server", "tools", len(loadedTools), "prompts", len(loadedPrompts))
-	for _, toolDef := range loadedTools {
-		slog.Debug("[main] Registering tool", "tool", toolDef.Name)
-		addToolToServer(mcpServer, toolDef)
+	stdioTransport := stdio.NewStdioServerTransport()
+	mcpServer := mcp.NewServer(stdioTransport,
+		mcp.WithName("td-go-mcp"),
+		mcp.WithVersion("0.2.0"),
+	)
+
+	// Register tools
+	toolHandlers := map[string]any{
+		"list_databases":       listDatabasesHandler,
+		"count_records":        countRecordsHandler,
+		"get_user_by_id":       getUserByIDHandler,
+		"list_active_sessions": listActiveSessionsHandler,
+		"list_of_tables":       listOfTablesHandler,
+		"connection_status":    connectionStatusHandler,
+		"glossary_resource":    glossaryResourceHandler,
 	}
-	for _, promptDef := range loadedPrompts {
-		slog.Debug("[main] Registering prompt", "prompt", promptDef.Name)
-		addPromptToServer(mcpServer, promptDef)
+
+	for _, toolDef := range loadedTools {
+		if handler, ok := toolHandlers[toolDef.Name]; ok {
+			err := mcpServer.RegisterTool(toolDef.Name, toolDef.Description, handler)
+			if err != nil {
+				slog.Error("failed to register tool", "tool", toolDef.Name, "err", err)
+			}
+		} else {
+			slog.Warn("no handler found for tool", "tool", toolDef.Name)
+		}
+	}
+
+	// Register prompts
+	for i := range loadedPrompts {
+		promptDef := loadedPrompts[i] // Create a new variable for the loop
+		handler := createPromptHandler(promptDef)
+		err := mcpServer.RegisterPrompt(promptDef.Name, promptDef.Description, handler)
+		if err != nil {
+			slog.Error("failed to register prompt", "prompt", promptDef.Name, "err", err)
+		}
 	}
 
 	slog.Info("[main] Starting MCP server with stdio transport...")
-	if err := mcpServer.Start(); err != nil {
+	err := mcpServer.Serve()
+	slog.Info("[main] mcpServer.Serve() returned", "err", err)
+	if err != nil {
 		slog.Error("[main] Server error", "err", err)
 		os.Exit(1)
 	}
-}
-
-func logDirContents(dir string) {
-	files, err := filepath.Glob(filepath.Join(dir, "*"))
-	if err != nil {
-		slog.Error("[main] Failed to glob directory", "dir", dir, "err", err)
-		return
-	}
-	if len(files) == 0 {
-		slog.Warn("[main] Directory is empty or missing", "dir", dir)
-	} else {
-		slog.Info("[main] Directory contents", "dir", dir, "files", files)
-	}
+	slog.Info("[main] Server finished. Press enter to exit.")
+	fmt.Scanln()
 }
