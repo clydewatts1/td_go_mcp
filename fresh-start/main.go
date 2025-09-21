@@ -5,95 +5,141 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"time"
 
-	_ "github.com/glebarez/sqlite"
+	_ "github.com/alexbrainman/odbc" // Import ODBC driver
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"gopkg.in/yaml.v3"
 )
 
-func main() {
-	// Initialize database connection (using SQLite for development)
-	db, err := sql.Open("sqlite", ":memory:")
+// Config represents the overall configuration
+type Config struct {
+	Database struct {
+		Driver string `yaml:"driver"`
+		DSN    string `yaml:"dsn"`
+	} `yaml:"database"`
+	Paths struct {
+		Tools     string `yaml:"tools"`
+		Prompts   string `yaml:"prompts"`
+		Resources string `yaml:"resources"`
+		Logs      string `yaml:"logs"`
+	} `yaml:"paths"`
+}
+
+// loadConfig loads configuration from the YAML file
+func loadConfig() (*Config, error) {
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		return nil, fmt.Errorf("failed to get user home directory: %w", err)
+	}
+	configPath := filepath.Join(homeDir, ".td_go_mcp", "config.yaml")
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	return &config, nil
+}
+
+// setupLogging configures structured logging
+func setupLogging(logPath string) (*slog.Logger, error) {
+	if logPath == "" {
+		// Default to logging to stderr if no path is provided
+		return slog.New(slog.NewJSONHandler(os.Stderr, nil)), nil
+	}
+
+	// Ensure the log directory exists
+	if err := os.MkdirAll(logPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	}
+
+	// Create a log file with a timestamp
+	logFile := filepath.Join(logPath, fmt.Sprintf("mcp-server-%s.log", time.Now().Format("2006-01-02-15-04-05")))
+	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	// Create a multi-writer to log to both file and stderr
+	multiWriter := io.MultiWriter(os.Stderr, file)
+	return slog.New(slog.NewJSONHandler(multiWriter, nil)), nil
+}
+
+func main() {
+	// Load configuration
+	config, err := loadConfig()
+	if err != nil {
+		slog.Error("Failed to load configuration", "error", err)
+		os.Exit(1)
+	}
+
+	// Setup logging
+	logger, err := setupLogging(config.Paths.Logs)
+	if err != nil {
+		slog.Error("Failed to set up logging", "error", err)
+		os.Exit(1)
+	}
+	slog.SetDefault(logger)
+
+	// Initialize database connection
+	db, err := sql.Open(config.Database.Driver, config.Database.DSN)
+	if err != nil {
+		slog.Error("Failed to open database", "driver", config.Database.Driver, "dsn", config.Database.DSN, "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
-	// Create sample tables and data
-	if err := initDatabase(db); err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+	// Check database connection
+	if err := db.Ping(); err != nil {
+		slog.Error("Failed to connect to database", "driver", config.Database.Driver, "dsn", config.Database.DSN, "error", err)
+		os.Exit(1)
 	}
+	slog.Info("Successfully connected to the database", "driver", config.Database.Driver, "dsn", config.Database.DSN)
 
 	// Create a new MCP server
 	mcpServer := server.NewMCPServer("td-go-mcp-fresh", "1.0.0")
 
 	// Add database tools to the server
-	addDatabaseTools(mcpServer, db)
+	addDatabaseTools(mcpServer, db, config)
 
 	// Start the stdio server
-	log.Println("Starting fresh MCP server...")
+	slog.Info("Starting fresh MCP server...")
 	if err := server.ServeStdio(mcpServer); err != nil {
-		log.Fatalf("Server error: %v", err)
+		slog.Error("Server error", "error", err)
+		os.Exit(1)
 	}
-}
-
-// initDatabase creates sample tables and inserts test data
-func initDatabase(db *sql.DB) error {
-	// Create users table
-	_, err := db.Exec(`
-		CREATE TABLE users (
-			id INTEGER PRIMARY KEY,
-			name TEXT NOT NULL,
-			email TEXT UNIQUE,
-			status TEXT DEFAULT 'active'
-		)
-	`)
-	if err != nil {
-		return err
-	}
-
-	// Create sessions table
-	_, err = db.Exec(`
-		CREATE TABLE sessions (
-			id INTEGER PRIMARY KEY,
-			user_id INTEGER,
-			start_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-			end_time DATETIME,
-			status TEXT DEFAULT 'active',
-			FOREIGN KEY (user_id) REFERENCES users(id)
-		)
-	`)
-	if err != nil {
-		return err
-	}
-
-	// Insert sample data
-	_, err = db.Exec(`
-		INSERT INTO users (name, email, status) VALUES
-		('Alice Johnson', 'alice@example.com', 'active'),
-		('Bob Smith', 'bob@example.com', 'active'),
-		('Charlie Brown', 'charlie@example.com', 'inactive')
-	`)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(`
-		INSERT INTO sessions (user_id, status) VALUES
-		(1, 'active'),
-		(2, 'active'),
-		(1, 'ended')
-	`)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // addDatabaseTools registers the database operation tools with the MCP server
-func addDatabaseTools(mcpServer *server.MCPServer, db *sql.DB) {
+func addDatabaseTools(mcpServer *server.MCPServer, db *sql.DB, config *Config) {
+	// Get DB Connection Info tool
+	getDBInfoTool := server.ServerTool{
+		Tool: mcp.Tool{
+			Name:        "get_db_connection_info",
+			Description: "Get information about the current database connection",
+			InputSchema: mcp.ToolInputSchema{
+				Type:       "object",
+				Properties: map[string]any{},
+				Required:   []string{},
+			},
+		},
+		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return handleGetDBConnectionInfo(db, config)
+		},
+	}
+
 	// Count records tool
 	countRecordsTool := server.ServerTool{
 		Tool: mcp.Tool{
@@ -176,8 +222,33 @@ func addDatabaseTools(mcpServer *server.MCPServer, db *sql.DB) {
 		},
 	}
 
-	mcpServer.AddTools(countRecordsTool, getUserTool, listSessionsTool)
+	mcpServer.AddTools(countRecordsTool, getUserTool, listSessionsTool, getDBInfoTool)
 	log.Println("Database tools registered")
+}
+
+// handleGetDBConnectionInfo handles the get_db_connection_info tool call
+func handleGetDBConnectionInfo(db *sql.DB, config *Config) (*mcp.CallToolResult, error) {
+	status := "connected"
+	if err := db.Ping(); err != nil {
+		status = fmt.Sprintf("disconnected: %v", err)
+	}
+
+	info := map[string]interface{}{
+		"driver": config.Database.Driver,
+		"dsn":    config.Database.DSN,
+		"status": status,
+	}
+
+	resultJSON, err := json.Marshal(info)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.NewTextContent(string(resultJSON)),
+		},
+	}, nil
 }
 
 // handleCountRecords handles the count_records tool call

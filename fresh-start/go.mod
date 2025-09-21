@@ -3,6 +3,7 @@ module github.com/clydewatts1/td-go-mcp-fresh
 go 1.25.0
 
 require (
+	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

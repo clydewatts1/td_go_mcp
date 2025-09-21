@@ -1,0 +1,1 @@
+{"time":"2025-09-21T16:18:16.0855236+01:00","level":"ERROR","msg":"Failed to connect to database","driver":"odbc","dsn":"CLEARSCAPE","error":"SQLDriverConnect: {IM002} [Microsoft][ODBC Driver Manager] Data source name not found and no default driver specified\n{01S00} [Microsoft][ODBC Driver Manager] Invalid connection string attribute"}
